@@ -17,27 +17,29 @@ type activeSecret struct {
 	stackID string
 }
 
-type initializationSecret struct {
+// InitializationSecret is the InitializationSupport variant for swarm.Secret
+type InitializationSecret struct {
 	cli interfaces.BackendClient
 }
 
 type algorithmSecret struct {
-	initializationSecret
+	InitializationSecret
 	requestedResource *interfaces.ReconcileResource
 	stackID           string
 	stackSpec         types.StackSpec
 	goals             map[string]*interfaces.ReconcileResource
 }
 
-func (a activeSecret) getSnapshot() interfaces.SnapshotResource {
+func (a activeSecret) GetSnapshot() interfaces.SnapshotResource {
 	return a.SnapshotResource
 }
 
-func (a activeSecret) getStackID() string {
+func (a activeSecret) GetStackID() string {
 	return a.stackID
 }
 
-func (i initializationSecret) getActiveResource(resource interfaces.ReconcileResource) (activeResource, error) {
+// GetActiveResource returns ActiveResource for swarm.Secret in interfaces.ReconcileResource
+func (i InitializationSecret) GetActiveResource(resource interfaces.ReconcileResource) (ActiveResource, error) {
 	secret, err := i.cli.GetSecret(resource.ID)
 	if err != nil {
 		return activeSecret{}, err
@@ -45,7 +47,7 @@ func (i initializationSecret) getActiveResource(resource interfaces.ReconcileRes
 	return i.wrapSecret(secret), nil
 }
 
-func (i initializationSecret) getSnapshotResourceNames(snapshot interfaces.SnapshotStack) []string {
+func (i InitializationSecret) getSnapshotResourceNames(snapshot interfaces.SnapshotStack) []string {
 	result := make([]string, 0, len(snapshot.Secrets))
 	for _, snapshotResource := range snapshot.Secrets {
 		result = append(result, snapshotResource.Name)
@@ -53,7 +55,7 @@ func (i initializationSecret) getSnapshotResourceNames(snapshot interfaces.Snaps
 	return result
 }
 
-func (i initializationSecret) wrapSecret(secret swarm.Secret) activeResource {
+func (i InitializationSecret) wrapSecret(secret swarm.Secret) ActiveResource {
 	stackID, ok := secret.Spec.Annotations.Labels[types.StackLabel]
 	if !ok {
 		stackID = ""
@@ -69,23 +71,26 @@ func (i initializationSecret) wrapSecret(secret swarm.Secret) activeResource {
 	}
 }
 
-func (i initializationSecret) getKind() interfaces.ReconcileKind {
+// GetKind returns interfaces.ReconcileSecret
+func (i InitializationSecret) GetKind() interfaces.ReconcileKind {
 	return interfaces.ReconcileSecret
 }
 
-func (i initializationSecret) createPlugin(snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) algorithmPlugin {
+// CreatePlugin creates algorithmSecret
+func (i InitializationSecret) CreatePlugin(snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) AlgorithmPlugin {
 	return newAlgorithmPluginSecret(i, snapshot, requestedResource)
 }
 
-func newInitializationSupportSecret(cli interfaces.BackendClient) initializationSecret {
-	return initializationSecret{
+// NewInitializationSupportSecret creates InitializationSecret
+func NewInitializationSupportSecret(cli interfaces.BackendClient) InitializationSecret {
+	return InitializationSecret{
 		cli: cli,
 	}
 }
 
-func newAlgorithmPluginSecret(secretInit initializationSecret, snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) *algorithmSecret {
+func newAlgorithmPluginSecret(secretInit InitializationSecret, snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) *algorithmSecret {
 	result := algorithmSecret{
-		initializationSecret: secretInit,
+		InitializationSecret: secretInit,
 		requestedResource:    requestedResource,
 		stackID:              snapshot.ID,
 		stackSpec:            snapshot.CurrentSpec,
@@ -136,14 +141,15 @@ func (a *algorithmSecret) getSpecifiedResourceNames() []string {
 	return result
 }
 
-func (a *algorithmSecret) getActiveResources() ([]activeResource, error) {
+// GetActiveResources returns ActiveResource array for swarm.Secrets belonging to the stack
+func (a *algorithmSecret) GetActiveResources() ([]ActiveResource, error) {
 	secrets, err := a.cli.GetSecrets(dockerTypes.SecretListOptions{
 		Filters: stackLabelFilter(a.stackID),
 	})
 	if err != nil {
-		return []activeResource{}, err
+		return []ActiveResource{}, err
 	}
-	result := make([]activeResource, 0, len(secrets))
+	result := make([]ActiveResource, 0, len(secrets))
 	for _, secret := range secrets {
 		result = append(result, a.wrapSecret(secret))
 	}
@@ -168,17 +174,17 @@ func (a *algorithmSecret) addCreateResourceGoal(specName string) *interfaces.Rec
 			Name: secretSpec.Annotations.Name,
 		},
 		Config: secretSpec,
-		Kind:   a.getKind(),
+		Kind:   a.GetKind(),
 	}
 	a.goals[specName] = resource
 	return resource
 }
 
-func (a *algorithmSecret) addRemoveResourceGoal(activeResource activeResource) *interfaces.ReconcileResource {
+func (a *algorithmSecret) addRemoveResourceGoal(activeResource ActiveResource) *interfaces.ReconcileResource {
 	activeSecret := activeResource.(activeSecret)
 	resource := &interfaces.ReconcileResource{
 		SnapshotResource: activeSecret.SnapshotResource,
-		Kind:             a.getKind(),
+		Kind:             a.GetKind(),
 		Config:           activeSecret.secret.Spec,
 	}
 	a.goals[activeSecret.Name] = resource
@@ -208,7 +214,7 @@ func (a *algorithmSecret) storeGoals(previous interfaces.SnapshotStack) (interfa
 	return current, nil
 }
 
-func (a *algorithmSecret) hasSameConfiguration(resource interfaces.ReconcileResource, actual activeResource) bool {
+func (a *algorithmSecret) hasSameConfiguration(resource interfaces.ReconcileResource, actual ActiveResource) bool {
 	one := resource.Config.(*swarm.SecretSpec)
 	two := actual.(activeSecret).secret.Spec
 	return one.Annotations.Name == two.Annotations.Name &&
@@ -218,7 +224,7 @@ func (a *algorithmSecret) hasSameConfiguration(resource interfaces.ReconcileReso
 		reflect.DeepEqual(one.Templating, two.Templating)
 }
 
-func (a *algorithmSecret) createResource(resource *interfaces.ReconcileResource) error {
+func (a *algorithmSecret) CreateResource(resource *interfaces.ReconcileResource) error {
 	secretSpec := resource.Config.(*swarm.SecretSpec)
 	if secretSpec.Annotations.Labels == nil {
 		secretSpec.Annotations.Labels = map[string]string{}
@@ -232,7 +238,7 @@ func (a *algorithmSecret) createResource(resource *interfaces.ReconcileResource)
 	return nil
 }
 
-func (a *algorithmSecret) deleteResource(resource *interfaces.ReconcileResource) error {
+func (a *algorithmSecret) DeleteResource(resource *interfaces.ReconcileResource) error {
 	err := a.cli.RemoveSecret(resource.ID)
 	// Ignore not found error
 	if err != nil && !errdefs.IsNotFound(err) {
@@ -242,7 +248,7 @@ func (a *algorithmSecret) deleteResource(resource *interfaces.ReconcileResource)
 	return nil
 }
 
-func (a *algorithmSecret) updateResource(resource interfaces.ReconcileResource) error {
+func (a *algorithmSecret) UpdateResource(resource interfaces.ReconcileResource) error {
 	// the response from UpdateSecret is irrelevant
 	err := a.cli.UpdateSecret(
 		resource.ID,

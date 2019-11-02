@@ -44,10 +44,10 @@ type reconcileStackResource interface {
 type reconcileStackRequest struct {
 	reconcileStackResource // nolint: unused
 	requestedResource      *interfaces.ReconcileResource
-	services               algorithmPlugin
-	networks               algorithmPlugin
-	secrets                algorithmPlugin
-	configs                algorithmPlugin
+	services               AlgorithmPlugin
+	networks               AlgorithmPlugin
+	secrets                AlgorithmPlugin
+	configs                AlgorithmPlugin
 }
 
 // New creates a new Reconciler object, which uses the provided
@@ -77,12 +77,12 @@ func (r *reconciler) Reconcile(request *interfaces.ReconcileResource) error {
 
 	r.stackRequest = nil
 
-	serviceInit := newInitializationSupportService(r.cli)
-	secretInit := newInitializationSupportSecret(r.cli)
-	networkInit := newInitializationSupportNetwork(r.cli)
-	configInit := newInitializationSupportConfig(r.cli)
+	serviceInit := NewInitializationSupportService(r.cli)
+	secretInit := NewInitializationSupportSecret(r.cli)
+	networkInit := NewInitializationSupportNetwork(r.cli)
+	configInit := NewInitializationSupportConfig(r.cli)
 
-	var algorithmInit initializationSupport
+	var algorithmInit InitializationSupport
 
 	if request.StackID == "" {
 		switch request.Kind {
@@ -104,7 +104,7 @@ func (r *reconciler) Reconcile(request *interfaces.ReconcileResource) error {
 			break
 		}
 		if algorithmInit != nil {
-			resource, err := algorithmInit.getActiveResource(*request)
+			resource, err := algorithmInit.GetActiveResource(*request)
 			if errdefs.IsNotFound(err) {
 				// If the resource isn't found,
 				// that means some other mutator is active and
@@ -116,7 +116,7 @@ func (r *reconciler) Reconcile(request *interfaces.ReconcileResource) error {
 				return err
 			}
 
-			if resource.getStackID() == "" {
+			if resource.GetStackID() == "" {
 				// If the resource stack label is not found,
 				// that means some other mutator is active and
 				// another reconciler approach is required
@@ -124,7 +124,7 @@ func (r *reconciler) Reconcile(request *interfaces.ReconcileResource) error {
 				// FIXME: Add reconciler statistic
 				return nil
 			}
-			request.StackID = resource.getStackID()
+			request.StackID = resource.GetStackID()
 		}
 	}
 
@@ -146,10 +146,10 @@ func (r *reconciler) Reconcile(request *interfaces.ReconcileResource) error {
 
 	r.stackRequest = &reconcileStackRequest{
 		requestedResource: request,
-		services:          serviceInit.createPlugin(snapshot, request),
-		secrets:           secretInit.createPlugin(snapshot, request),
-		networks:          networkInit.createPlugin(snapshot, request),
-		configs:           configInit.createPlugin(snapshot, request),
+		services:          serviceInit.CreatePlugin(snapshot, request),
+		secrets:           secretInit.CreatePlugin(snapshot, request),
+		networks:          networkInit.CreatePlugin(snapshot, request),
+		configs:           configInit.CreatePlugin(snapshot, request),
 	}
 
 	_, err = r.reconcile(snapshot)

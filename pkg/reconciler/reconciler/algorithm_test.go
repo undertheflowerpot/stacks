@@ -46,7 +46,7 @@ func ConsistOfIDs(ids ...string) GomegaMatcher {
 
 // addSpecifiedResources uses the plugin implementations in order to use the abstracted interfaces
 // so that a generalized test possible
-func addSpecifiedResources(init initializationSupport, stackSpec types.StackSpec, stackID string) []string {
+func addSpecifiedResources(init InitializationSupport, stackSpec types.StackSpec, stackID string) []string {
 	snapshot := interfaces.SnapshotStack{
 		SnapshotResource: interfaces.SnapshotResource{
 			ID: stackID,
@@ -54,14 +54,14 @@ func addSpecifiedResources(init initializationSupport, stackSpec types.StackSpec
 		CurrentSpec: stackSpec,
 	}
 	emptyRequest := &interfaces.ReconcileResource{}
-	plugin := init.createPlugin(snapshot, emptyRequest)
+	plugin := init.CreatePlugin(snapshot, emptyRequest)
 
 	names := plugin.getSpecifiedResourceNames()
 	Expect(names).To(HaveLen(2))
 	resource1 := plugin.addCreateResourceGoal(names[0])
 	resource2 := plugin.addCreateResourceGoal(names[1])
-	err1 := plugin.createResource(resource1)
-	err2 := plugin.createResource(resource2)
+	err1 := plugin.CreateResource(resource1)
+	err2 := plugin.CreateResource(resource2)
 
 	Expect(err1).ToNot(HaveOccurred())
 	Expect(err2).ToNot(HaveOccurred())
@@ -69,64 +69,64 @@ func addSpecifiedResources(init initializationSupport, stackSpec types.StackSpec
 	return []string{resource1.ID, resource2.ID}
 }
 
-func removeSpecifiedResource(init initializationSupport, snapshot interfaces.SnapshotStack, name string, stackID string) error {
+func removeSpecifiedResource(init InitializationSupport, snapshot interfaces.SnapshotStack, name string, stackID string) error {
 	emptyRequest := &interfaces.ReconcileResource{}
-	plugin := init.createPlugin(snapshot, emptyRequest)
+	plugin := init.CreatePlugin(snapshot, emptyRequest)
 	resource := plugin.getGoalResource(name)
-	active, err := plugin.getActiveResource(*resource)
+	active, err := plugin.GetActiveResource(*resource)
 	Expect(err).ToNot(HaveOccurred())
-	resource.ID = active.getSnapshot().ID
-	return plugin.deleteResource(resource)
+	resource.ID = active.GetSnapshot().ID
+	return plugin.DeleteResource(resource)
 }
 
-func changeSpecifiedResource(init initializationSupport, snapshot interfaces.SnapshotStack, name string, stackID string) error {
+func changeSpecifiedResource(init InitializationSupport, snapshot interfaces.SnapshotStack, name string, stackID string) error {
 	emptyRequest := &interfaces.ReconcileResource{}
-	plugin := init.createPlugin(snapshot, emptyRequest)
+	plugin := init.CreatePlugin(snapshot, emptyRequest)
 	resource := plugin.getGoalResource(name)
-	active, err := plugin.getActiveResource(*resource)
+	active, err := plugin.GetActiveResource(*resource)
 	Expect(err).ToNot(HaveOccurred())
-	resource.ID = active.getSnapshot().ID
-	resource.Meta = active.getSnapshot().Meta
-	if init.getKind() == interfaces.ReconcileService {
+	resource.ID = active.GetSnapshot().ID
+	resource.Meta = active.GetSnapshot().Meta
+	if init.GetKind() == interfaces.ReconcileService {
 		resource.Config.(*swarm.ServiceSpec).UpdateConfig = &swarm.UpdateConfig{}
-	} else if init.getKind() == interfaces.ReconcileConfig {
+	} else if init.GetKind() == interfaces.ReconcileConfig {
 		resource.Config.(*swarm.ConfigSpec).Templating = &swarm.Driver{}
-	} else if init.getKind() == interfaces.ReconcileSecret {
+	} else if init.GetKind() == interfaces.ReconcileSecret {
 		resource.Config.(*swarm.SecretSpec).Driver = &swarm.Driver{}
-	} else if init.getKind() == interfaces.ReconcileNetwork {
+	} else if init.GetKind() == interfaces.ReconcileNetwork {
 		resource.Config.(*dockerTypes.NetworkCreateRequest).NetworkCreate.Driver = "driver"
 	}
-	err1 := plugin.updateResource(*resource)
+	err1 := plugin.UpdateResource(*resource)
 	return err1
 }
 
-func mutateSnapshot(init initializationSupport, snapshot *interfaces.SnapshotStack) {
-	if init.getKind() == interfaces.ReconcileService {
+func mutateSnapshot(init InitializationSupport, snapshot *interfaces.SnapshotStack) {
+	if init.GetKind() == interfaces.ReconcileService {
 		service := snapshot.Services[0]
 		snapshot.Services = []interfaces.SnapshotResource{service}
-	} else if init.getKind() == interfaces.ReconcileConfig {
+	} else if init.GetKind() == interfaces.ReconcileConfig {
 		config := snapshot.Configs[0]
 		snapshot.Configs = []interfaces.SnapshotResource{config}
-	} else if init.getKind() == interfaces.ReconcileSecret {
+	} else if init.GetKind() == interfaces.ReconcileSecret {
 		secret := snapshot.Secrets[0]
 		snapshot.Secrets = []interfaces.SnapshotResource{secret}
-	} else if init.getKind() == interfaces.ReconcileNetwork {
+	} else if init.GetKind() == interfaces.ReconcileNetwork {
 		network := snapshot.Networks[0]
 		snapshot.Networks = []interfaces.SnapshotResource{network}
 	}
 }
 
-func mutateStackSpec(init initializationSupport, stackSpec *types.StackSpec) {
-	if init.getKind() == interfaces.ReconcileService {
+func mutateStackSpec(init InitializationSupport, stackSpec *types.StackSpec) {
+	if init.GetKind() == interfaces.ReconcileService {
 		service := stackSpec.Services[0]
 		stackSpec.Services = []swarm.ServiceSpec{service}
-	} else if init.getKind() == interfaces.ReconcileConfig {
+	} else if init.GetKind() == interfaces.ReconcileConfig {
 		config := stackSpec.Configs[0]
 		stackSpec.Configs = []swarm.ConfigSpec{config}
-	} else if init.getKind() == interfaces.ReconcileSecret {
+	} else if init.GetKind() == interfaces.ReconcileSecret {
 		secret := stackSpec.Secrets[0]
 		stackSpec.Secrets = []swarm.SecretSpec{secret}
-	} else if init.getKind() == interfaces.ReconcileNetwork {
+	} else if init.GetKind() == interfaces.ReconcileNetwork {
 		for k := range stackSpec.Networks {
 			delete(stackSpec.Networks, k)
 			break
@@ -136,7 +136,7 @@ func mutateStackSpec(init initializationSupport, stackSpec *types.StackSpec) {
 
 type Stuff struct {
 	cli                            *fakes.FakeReconcilerClient
-	pluginInit                     initializationSupport
+	pluginInit                     InitializationSupport
 	stackSpec, plainStackSpec      types.StackSpec
 	cheatStackSpec, errorStackSpec types.StackSpec
 	plainStackSpecRemoveErr        types.StackSpec
@@ -213,7 +213,7 @@ func algorithmTest(stuff *Stuff) {
 		Expect(stuff).ToNot(BeNil())
 	})
 	var (
-		algorithmPlugin   algorithmPlugin
+		algorithmPlugin   AlgorithmPlugin
 		err, err1         error
 		resourceIDs       []string
 		current, snapshot interfaces.SnapshotStack
@@ -222,7 +222,7 @@ func algorithmTest(stuff *Stuff) {
 		BeforeEach(func() {
 			resourceIDs = addSpecifiedResources(stuff.pluginInit, stuff.stackSpec, stuff.stackID)
 			snapshot, _ = stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
-			algorithmPlugin = stuff.pluginInit.createPlugin(snapshot, stuff.request)
+			algorithmPlugin = stuff.pluginInit.CreatePlugin(snapshot, stuff.request)
 			current, err = algorithmPlugin.reconcile(snapshot)
 		})
 		It("New resources created", func() {
@@ -236,7 +236,7 @@ func algorithmTest(stuff *Stuff) {
 		BeforeEach(func() {
 			resourceIDs = addSpecifiedResources(stuff.pluginInit, stuff.cheatStackSpec, stuff.stackID)
 			snapshot, _ = stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
-			algorithmPlugin = stuff.pluginInit.createPlugin(snapshot, stuff.request)
+			algorithmPlugin = stuff.pluginInit.CreatePlugin(snapshot, stuff.request)
 			current, err = algorithmPlugin.reconcile(snapshot)
 		})
 		It("New resources created", func() {
@@ -249,7 +249,7 @@ func algorithmTest(stuff *Stuff) {
 		BeforeEach(func() {
 			resourceIDs = addSpecifiedResources(stuff.pluginInit, stuff.plainStackSpec, "")
 			snapshot, _ := stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
-			algorithmPlugin = stuff.pluginInit.createPlugin(snapshot, stuff.request)
+			algorithmPlugin = stuff.pluginInit.CreatePlugin(snapshot, stuff.request)
 			current, err = algorithmPlugin.reconcile(snapshot)
 		})
 		It("they should not fail", func() {
@@ -263,7 +263,7 @@ func algorithmTest(stuff *Stuff) {
 			snapshot, _ := stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
 			_ = stuff.cli.UpdateStack(stuff.stackID, stuff.plainStackSpecRemoveErr, snapshot.Meta.Version.Index)
 			snapshot, _ = stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
-			algorithmPlugin = stuff.pluginInit.createPlugin(snapshot, stuff.request)
+			algorithmPlugin = stuff.pluginInit.CreatePlugin(snapshot, stuff.request)
 			current, err = algorithmPlugin.reconcile(snapshot)
 		})
 		It("they should not fail", func() {
@@ -280,7 +280,7 @@ func algorithmTest(stuff *Stuff) {
 				err1 = stuff.cli.UpdateStack(stuff.stackID, stuff.plainStackSpecRemoveErr, current.Meta.Version.Index)
 				altered, _ = stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
 
-				algorithmPlugin = stuff.pluginInit.createPlugin(altered, stuff.request)
+				algorithmPlugin = stuff.pluginInit.CreatePlugin(altered, stuff.request)
 				_, err = algorithmPlugin.reconcile(altered)
 			})
 			It("All should be same", func() {
@@ -294,7 +294,7 @@ func algorithmTest(stuff *Stuff) {
 			snapshot, _ := stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
 			_ = stuff.cli.UpdateStack(stuff.stackID, stuff.plainStackSpecUpdateErr, snapshot.Meta.Version.Index)
 			snapshot, _ = stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
-			algorithmPlugin = stuff.pluginInit.createPlugin(snapshot, stuff.request)
+			algorithmPlugin = stuff.pluginInit.CreatePlugin(snapshot, stuff.request)
 			current, err = algorithmPlugin.reconcile(snapshot)
 		})
 		It("they should not fail", func() {
@@ -311,11 +311,11 @@ func algorithmTest(stuff *Stuff) {
 				err1 = stuff.cli.UpdateStack(stuff.stackID, stuff.plainStackSpecUpdateErr, current.Meta.Version.Index)
 				altered, _ = stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
 
-				algorithmPlugin = stuff.pluginInit.createPlugin(altered, stuff.request)
+				algorithmPlugin = stuff.pluginInit.CreatePlugin(altered, stuff.request)
 				_, err = algorithmPlugin.reconcile(altered)
 			})
 			It("All should be same", func() {
-				if algorithmPlugin.getKind() == interfaces.ReconcileNetwork {
+				if algorithmPlugin.GetKind() == interfaces.ReconcileNetwork {
 					Skip("NETWORKS DO NOT HAVE UPDATE AVAILABLE")
 				}
 				Expect(err == fakes.FakeUnimplemented).To(BeTrue())
@@ -326,7 +326,7 @@ func algorithmTest(stuff *Stuff) {
 	Context("Unmodified creation reconciliation", func() {
 		BeforeEach(func() {
 			snapshot, _ := stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
-			algorithmPlugin = stuff.pluginInit.createPlugin(snapshot, stuff.request)
+			algorithmPlugin = stuff.pluginInit.CreatePlugin(snapshot, stuff.request)
 			current, err = algorithmPlugin.reconcile(snapshot)
 		})
 		It("they should not fail", func() {
@@ -339,7 +339,7 @@ func algorithmTest(stuff *Stuff) {
 		Context("Fast-path NOP reconciliation", func() {
 			var deeper interfaces.SnapshotStack
 			BeforeEach(func() {
-				algorithmPlugin = stuff.pluginInit.createPlugin(current, stuff.request)
+				algorithmPlugin = stuff.pluginInit.CreatePlugin(current, stuff.request)
 				deeper, err = algorithmPlugin.reconcile(current)
 			})
 			It("All should be same", func() {
@@ -352,7 +352,7 @@ func algorithmTest(stuff *Stuff) {
 		Context("Fast-path NOP reconciliation With SKIP", func() {
 			var deeper interfaces.SnapshotStack
 			BeforeEach(func() {
-				algorithmPlugin = stuff.pluginInit.createPlugin(current, stuff.request)
+				algorithmPlugin = stuff.pluginInit.CreatePlugin(current, stuff.request)
 				name := algorithmPlugin.getSpecifiedResourceNames()[0]
 				algorithmPlugin.getGoalResource(name).Mark = interfaces.ReconcileSkip
 				deeper, err = algorithmPlugin.reconcile(current)
@@ -371,7 +371,7 @@ func algorithmTest(stuff *Stuff) {
 				err1 = stuff.cli.UpdateStack(stuff.stackID, stuff.plainStackSpec, current.Meta.Version.Index)
 				altered, _ = stuff.cli.FakeStackStore.GetSnapshotStack(stuff.stackID)
 
-				algorithmPlugin = stuff.pluginInit.createPlugin(altered, stuff.request)
+				algorithmPlugin = stuff.pluginInit.CreatePlugin(altered, stuff.request)
 				deeper, err = algorithmPlugin.reconcile(altered)
 			})
 			It("All should be same", func() {
@@ -385,7 +385,7 @@ func algorithmTest(stuff *Stuff) {
 		Context("Remove resource before stack reconciliation", func() {
 			var deeper interfaces.SnapshotStack
 			BeforeEach(func() {
-				algorithmPlugin = stuff.pluginInit.createPlugin(current, stuff.request)
+				algorithmPlugin = stuff.pluginInit.CreatePlugin(current, stuff.request)
 				name := algorithmPlugin.getSpecifiedResourceNames()[0]
 				err1 = removeSpecifiedResource(stuff.pluginInit, current, name, stuff.stackID)
 				deeper, err = algorithmPlugin.reconcile(current)
@@ -405,7 +405,7 @@ func algorithmTest(stuff *Stuff) {
 				deeper, err1 = stuff.cli.UpdateSnapshotStack(stuff.stackID, current, current.Meta.Version.Index)
 				Expect(stuff.pluginInit.getSnapshotResourceNames(deeper)).To(HaveLen(1))
 
-				algorithmPlugin = stuff.pluginInit.createPlugin(deeper, stuff.request)
+				algorithmPlugin = stuff.pluginInit.CreatePlugin(deeper, stuff.request)
 				deeper, err = algorithmPlugin.reconcile(deeper)
 			})
 			It("All should be same", func() {
@@ -422,7 +422,7 @@ func algorithmTest(stuff *Stuff) {
 				err1 = removeSpecifiedResource(stuff.pluginInit, current, name, stuff.stackID)
 
 				_, err1 = stuff.cli.UpdateSnapshotStack(stuff.stackID, current, current.Meta.Version.Index)
-				algorithmPlugin = stuff.pluginInit.createPlugin(current, stuff.request)
+				algorithmPlugin = stuff.pluginInit.CreatePlugin(current, stuff.request)
 				_, err = algorithmPlugin.reconcile(current)
 			})
 			It("All should be same", func() {
@@ -435,11 +435,11 @@ func algorithmTest(stuff *Stuff) {
 			BeforeEach(func() {
 				name := algorithmPlugin.getSpecifiedResourceNames()[0]
 				err1 = changeSpecifiedResource(stuff.pluginInit, current, name, stuff.stackID)
-				algorithmPlugin = stuff.pluginInit.createPlugin(current, stuff.request)
+				algorithmPlugin = stuff.pluginInit.CreatePlugin(current, stuff.request)
 				deeper, err = algorithmPlugin.reconcile(current)
 			})
 			It("All should be same", func() {
-				if algorithmPlugin.getKind() == interfaces.ReconcileNetwork {
+				if algorithmPlugin.GetKind() == interfaces.ReconcileNetwork {
 					Skip("NETWORKS DO NOT HAVE UPDATE AVAILABLE")
 				}
 				Expect(err1).ToNot(HaveOccurred())
@@ -458,7 +458,7 @@ var _ = Describe("Algorithm Test - Services", func() {
 	)
 	BeforeEach(func() {
 		makeStuff(&stuff)
-		stuff.pluginInit = newInitializationSupportService(stuff.cli)
+		stuff.pluginInit = NewInitializationSupportService(stuff.cli)
 		stuff.request = &interfaces.ReconcileResource{
 			SnapshotResource: interfaces.SnapshotResource{
 				ID: stuff.stackID,
@@ -477,7 +477,7 @@ var _ = Describe("Algorithm Test - Configs", func() {
 	)
 	BeforeEach(func() {
 		makeStuff(&stuff)
-		stuff.pluginInit = newInitializationSupportConfig(stuff.cli)
+		stuff.pluginInit = NewInitializationSupportConfig(stuff.cli)
 		stuff.request = &interfaces.ReconcileResource{
 			SnapshotResource: interfaces.SnapshotResource{
 				ID: stuff.stackID,
@@ -494,7 +494,7 @@ var _ = Describe("Algorithm Test - Secrets", func() {
 	)
 	BeforeEach(func() {
 		makeStuff(&stuff)
-		stuff.pluginInit = newInitializationSupportSecret(stuff.cli)
+		stuff.pluginInit = NewInitializationSupportSecret(stuff.cli)
 		stuff.request = &interfaces.ReconcileResource{
 			SnapshotResource: interfaces.SnapshotResource{
 				ID: stuff.stackID,
@@ -511,7 +511,7 @@ var _ = Describe("Algorithm Test - Networks", func() {
 	)
 	BeforeEach(func() {
 		makeStuff(&stuff)
-		stuff.pluginInit = newInitializationSupportNetwork(stuff.cli)
+		stuff.pluginInit = NewInitializationSupportNetwork(stuff.cli)
 		stuff.request = &interfaces.ReconcileResource{
 			SnapshotResource: interfaces.SnapshotResource{
 				ID: stuff.stackID,

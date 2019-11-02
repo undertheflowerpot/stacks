@@ -12,17 +12,17 @@ import (
 
 // AlgorithmPluginInputs is shared state for shared Ginko tests
 type AlgorithmPluginInputs struct {
-	algorithmInit                    initializationSupport
-	resourcePlugin                   algorithmPlugin
+	algorithmInit                    InitializationSupport
+	resourcePlugin                   AlgorithmPlugin
 	err1, err2                       error
 	search1, search2                 interfaces.ReconcileResource
-	activeResource1, activeResource2 activeResource
+	activeResource1, activeResource2 ActiveResource
 	stackID                          string
 	request                          *interfaces.ReconcileResource
 	stack                            *types.Stack
 	specName                         string
 	resource                         *interfaces.ReconcileResource
-	activeResource                   activeResource
+	activeResource                   ActiveResource
 	cli                              *fakes.FakeReconcilerClient
 }
 
@@ -30,23 +30,23 @@ type AlgorithmPluginInputs struct {
 func SharedFailedResponseBehavior(inputs *AlgorithmPluginInputs) {
 	BeforeEach(func() {
 		inputs.activeResource1, inputs.err1 =
-			inputs.algorithmInit.getActiveResource(inputs.search1)
+			inputs.algorithmInit.GetActiveResource(inputs.search1)
 		inputs.activeResource2, inputs.err2 =
-			inputs.algorithmInit.getActiveResource(inputs.search2)
+			inputs.algorithmInit.GetActiveResource(inputs.search2)
 	})
 	Context("Testing 5 6 7", func() {
 		It("the UN-LABELED resource should not fail", func() {
 			Expect(inputs.err1).ToNot(HaveOccurred())
-			Expect(inputs.activeResource1.getSnapshot().Name).To(Equal(inputs.search1.Name))
-			Expect("").To(Equal(inputs.activeResource1.getStackID()))
+			Expect(inputs.activeResource1.GetSnapshot().Name).To(Equal(inputs.search1.Name))
+			Expect("").To(Equal(inputs.activeResource1.GetStackID()))
 		})
 	})
 	Context("Testing 1 2 4", func() {
 		It("the LABELED resource should not fail", func() {
 			Expect(inputs.err2).ToNot(HaveOccurred())
-			Expect(inputs.activeResource2.getSnapshot().Name).To(Equal(inputs.search2.Name))
-			Expect("").ToNot(Equal(inputs.activeResource2.getStackID()))
-			Expect(inputs.stackID).To(Equal(inputs.activeResource2.getStackID()))
+			Expect(inputs.activeResource2.GetSnapshot().Name).To(Equal(inputs.search2.Name))
+			Expect("").ToNot(Equal(inputs.activeResource2.GetStackID()))
+			Expect(inputs.stackID).To(Equal(inputs.activeResource2.GetStackID()))
 		})
 	})
 }
@@ -74,7 +74,7 @@ func FreshPluginAssertions(input *AlgorithmPluginInputs) {
 	})
 
 	It("No ACTIVE resources findable", func() {
-		noActiveResources, err := input.resourcePlugin.getActiveResources()
+		noActiveResources, err := input.resourcePlugin.GetActiveResources()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(noActiveResources).To(BeEmpty())
 	})
@@ -111,7 +111,7 @@ func CreatedGoalAssertions(input *AlgorithmPluginInputs) {
 	})
 
 	It("No ACTIVE resources findable", func() {
-		noActiveResources, err := input.resourcePlugin.getActiveResources()
+		noActiveResources, err := input.resourcePlugin.GetActiveResources()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(noActiveResources).To(BeEmpty())
 	})
@@ -124,7 +124,7 @@ func ManuallyReconcileGoal(input *AlgorithmPluginInputs) {
 	)
 
 	BeforeEach(func() {
-		createErr = input.resourcePlugin.createResource(input.resource)
+		createErr = input.resourcePlugin.CreateResource(input.resource)
 	})
 
 	It("resource creation updates resource pointer", func() {
@@ -133,16 +133,16 @@ func ManuallyReconcileGoal(input *AlgorithmPluginInputs) {
 	})
 
 	It("ACTIVE resources findable", func() {
-		activeResources, err := input.resourcePlugin.getActiveResources()
+		activeResources, err := input.resourcePlugin.GetActiveResources()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(activeResources).ToNot(BeEmpty())
 	})
 
 	It("ACTIVE resource findable", func() {
 		var err error
-		input.activeResource, err = input.resourcePlugin.getActiveResource(*input.resource)
+		input.activeResource, err = input.resourcePlugin.GetActiveResource(*input.resource)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(input.activeResource.getSnapshot().ID).To(Equal(input.resource.ID))
+		Expect(input.activeResource.GetSnapshot().ID).To(Equal(input.resource.ID))
 	})
 
 	It("ACTIVE resource matches configuration", func() {
@@ -175,11 +175,11 @@ func ManuallyStoreGoal(input *AlgorithmPluginInputs) {
 func ManuallyRemoveGoal(input *AlgorithmPluginInputs) {
 	var (
 		resource       *interfaces.ReconcileResource
-		activeResource activeResource
+		activeResource ActiveResource
 		err            error
 	)
 	BeforeEach(func() {
-		activeResource, err = input.resourcePlugin.getActiveResource(*input.resource)
+		activeResource, err = input.resourcePlugin.GetActiveResource(*input.resource)
 		Expect(err).ToNot(HaveOccurred())
 		resource = input.resourcePlugin.addRemoveResourceGoal(activeResource)
 	})
@@ -187,8 +187,8 @@ func ManuallyRemoveGoal(input *AlgorithmPluginInputs) {
 		Expect(resource).ToNot(BeNil())
 		Expect(resource.SnapshotResource).ToNot(BeNil())
 		Expect(activeResource).ToNot(BeNil())
-		Expect(activeResource.getSnapshot()).ToNot(BeNil())
-		Expect(resource.SnapshotResource).To(Equal(activeResource.getSnapshot()))
+		Expect(activeResource.GetSnapshot()).ToNot(BeNil())
+		Expect(resource.SnapshotResource).To(Equal(activeResource.GetSnapshot()))
 		Expect(input.resourcePlugin.getGoalResources()).To(ContainElement(resource))
 	})
 }
@@ -199,7 +199,7 @@ func ManuallyReconcileRemoveGoal(input *AlgorithmPluginInputs) {
 		err error
 	)
 	BeforeEach(func() {
-		err = input.resourcePlugin.deleteResource(input.resource)
+		err = input.resourcePlugin.DeleteResource(input.resource)
 	})
 	It("And snapshot resources update", func() {
 		Expect(err).ToNot(HaveOccurred())
@@ -212,9 +212,9 @@ func ManuallyReconcileUpdateGoal(input *AlgorithmPluginInputs) {
 		err error
 	)
 	BeforeEach(func() {
-		act, _ := input.resourcePlugin.getActiveResource(*input.resource)
-		input.resource.Meta = act.getSnapshot().Meta
-		err = input.resourcePlugin.updateResource(*input.resource)
+		act, _ := input.resourcePlugin.GetActiveResource(*input.resource)
+		input.resource.Meta = act.GetSnapshot().Meta
+		err = input.resourcePlugin.UpdateResource(*input.resource)
 	})
 	It("And snapshot resources update", func() {
 		Expect(err).ToNot(HaveOccurred())

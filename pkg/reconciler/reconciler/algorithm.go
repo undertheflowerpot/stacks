@@ -57,56 +57,59 @@ import (
  *  stack and in the resource
  */
 
-// activeResource is an ephemeral wrapper meant to carry the GOAL identifiers
+// ActiveResource is an ephemeral wrapper meant to carry the GOAL identifiers
 // about a resource and the queried types.Stack resource (service, config,
 // network, secret).  This wrapper separates the algorithm from
 // the representation.  There are four implementations of this interface.
-type activeResource interface {
-	getSnapshot() interfaces.SnapshotResource
-	getStackID() string
+type ActiveResource interface {
+	GetSnapshot() interfaces.SnapshotResource
+	GetStackID() string
 }
 
-// algorithmPlugin hides the Resource specific minutiae from the algorithm's
+// InitializationSupport represents the minimal initialization dependencies
+// and testing preamble for each algorithmPlugin
+type InitializationSupport interface {
+	GetActiveResource(interfaces.ReconcileResource) (ActiveResource, error)
+	// for testing
+	getSnapshotResourceNames(interfaces.SnapshotStack) []string
+	GetKind() interfaces.ReconcileKind
+	CreatePlugin(interfaces.SnapshotStack, *interfaces.ReconcileResource) AlgorithmPlugin
+}
+
+// AlgorithmPlugin hides the Resource specific minutiae from the algorithm's
 // progress.  This interface represents that
 // 1. the algorithm needs to compare the current spec, the active resource
 //    and maintain the goal set.
 // 2. add and store goals
 // 3. change resources
 // There are four implementations of this interface.
-type initializationSupport interface {
-	getActiveResource(interfaces.ReconcileResource) (activeResource, error)
-	// for testing
-	getSnapshotResourceNames(interfaces.SnapshotStack) []string
-	getKind() interfaces.ReconcileKind
-	createPlugin(interfaces.SnapshotStack, *interfaces.ReconcileResource) algorithmPlugin
-}
-type algorithmPlugin interface {
-	initializationSupport
+type AlgorithmPlugin interface {
+	InitializationSupport
 	reconcileStackResource
 
 	getSpecifiedResourceNames() []string
 	lookupSpecifiedResource(name string) interface{}
 
-	getActiveResources() ([]activeResource, error)
+	GetActiveResources() ([]ActiveResource, error)
 
 	getGoalResources() []*interfaces.ReconcileResource
 	getGoalResource(name string) *interfaces.ReconcileResource
 
 	// FIXME: Clarify the precondition, resource.ID != ""
-	hasSameConfiguration(resource interfaces.ReconcileResource, actual activeResource) bool
+	hasSameConfiguration(resource interfaces.ReconcileResource, actual ActiveResource) bool
 
 	addCreateResourceGoal(specName string) *interfaces.ReconcileResource
-	addRemoveResourceGoal(resource activeResource) *interfaces.ReconcileResource
+	addRemoveResourceGoal(resource ActiveResource) *interfaces.ReconcileResource
 	storeGoals(interfaces.SnapshotStack) (interfaces.SnapshotStack, error)
 
-	// createResource creates the Docker resource AND updates resource.ID
-	createResource(*interfaces.ReconcileResource) error
+	// CreateResource creates the Docker resource AND updates resource.ID
+	CreateResource(*interfaces.ReconcileResource) error
 
-	// deleteResource deletes the Docker resource AND erases resource.ID
-	deleteResource(resource *interfaces.ReconcileResource) error
+	// DeleteResource deletes the Docker resource AND erases resource.ID
+	DeleteResource(resource *interfaces.ReconcileResource) error
 
-	// updateResource updates the Docker resource ONLY
-	updateResource(interfaces.ReconcileResource) error
+	// UpdateResource updates the Docker resource ONLY
+	UpdateResource(interfaces.ReconcileResource) error
 }
 
 // stackLabelFilter constructs a filter.Args which filters for stacks based on
@@ -116,9 +119,9 @@ func stackLabelFilter(stackID string) filters.Args {
 }
 
 // reconcileResource implements the reconciliation pattern using an
-// individual algorithmPlugin interface
+// individual AlgorithmPlugin interface
 // nolint: gocyclo
-func reconcileResource(current interfaces.SnapshotStack, plugin algorithmPlugin) (interfaces.SnapshotStack, error) {
+func reconcileResource(current interfaces.SnapshotStack, plugin AlgorithmPlugin) (interfaces.SnapshotStack, error) {
 
 	// QUERY (see file comment)
 	//
@@ -182,13 +185,13 @@ func reconcileResource(current interfaces.SnapshotStack, plugin algorithmPlugin)
 	//              - Compare active specification to Stack specification
 	//                and mark SAME xor UPDATE
 	//
-	activeResources, err := plugin.getActiveResources()
+	activeResources, err := plugin.GetActiveResources()
 	if err != nil {
 		return current, err
 	}
 
 	for _, activeResourceWrapper := range activeResources {
-		activeResource := activeResourceWrapper.getSnapshot()
+		activeResource := activeResourceWrapper.GetSnapshot()
 		resource := plugin.getGoalResource(activeResource.Name)
 		if resource != nil {
 
@@ -264,7 +267,7 @@ func reconcileResource(current interfaces.SnapshotStack, plugin algorithmPlugin)
 			 * purposes.
 			 *
 			 * for _, activeResource := range activeResources {
-			 *	if activeResource.getSnapshot().Name == resource.Name {
+			 *	if activeResource.GetSnapshot().Name == resource.Name {
 			 *		return current, errdefs.Forbidden("Resource inexplicably found")
 			 *	}
 			 * }
@@ -275,7 +278,7 @@ func reconcileResource(current interfaces.SnapshotStack, plugin algorithmPlugin)
 			// security is to delete and re-create.
 			if resource.ID != "" {
 				// ignore error
-				_ = plugin.deleteResource(resource)
+				_ = plugin.DeleteResource(resource)
 			}
 			resource.Mark = interfaces.ReconcileCreate
 			resource.ID = ""
@@ -317,11 +320,11 @@ func reconcileResource(current interfaces.SnapshotStack, plugin algorithmPlugin)
 			// FIXME: One potential error condition is a name
 			// collision with an existing resource not found in
 			// this stack
-			mutationError = plugin.createResource(resource)
+			mutationError = plugin.CreateResource(resource)
 		} else if resource.Mark == interfaces.ReconcileDelete {
-			mutationError = plugin.deleteResource(resource)
+			mutationError = plugin.DeleteResource(resource)
 		} else if resource.Mark == interfaces.ReconcileUpdate {
-			mutationError = plugin.updateResource(*resource)
+			mutationError = plugin.UpdateResource(*resource)
 		}
 		if mutationError == nil {
 			// Depending on the optimisms of the implemented balk

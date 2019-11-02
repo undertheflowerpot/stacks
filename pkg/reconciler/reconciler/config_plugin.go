@@ -18,27 +18,29 @@ type activeConfig struct {
 	stackID           string
 }
 
-type initializationConfig struct {
+// InitializationConfig is the InitializationSupport variant for swarm.Config
+type InitializationConfig struct {
 	cli interfaces.BackendClient
 }
 
 type algorithmConfig struct {
-	initializationConfig
+	InitializationConfig
 	requestedResource *interfaces.ReconcileResource
 	stackID           string
 	stackSpec         types.StackSpec
 	goals             map[string]*interfaces.ReconcileResource
 }
 
-func (a activeConfig) getSnapshot() interfaces.SnapshotResource {
+func (a activeConfig) GetSnapshot() interfaces.SnapshotResource {
 	return a.SnapshotResource
 }
 
-func (a activeConfig) getStackID() string {
+func (a activeConfig) GetStackID() string {
 	return a.stackID
 }
 
-func (i initializationConfig) getActiveResource(resource interfaces.ReconcileResource) (activeResource, error) {
+// GetActiveResource returns ActiveResource for swarm.Config in interfaces.ReconcileResource
+func (i InitializationConfig) GetActiveResource(resource interfaces.ReconcileResource) (ActiveResource, error) {
 	config, err := i.cli.GetConfig(resource.ID)
 	if err != nil {
 		return activeConfig{}, err
@@ -46,7 +48,7 @@ func (i initializationConfig) getActiveResource(resource interfaces.ReconcileRes
 	return i.wrapConfig(config), nil
 }
 
-func (i initializationConfig) getSnapshotResourceNames(snapshot interfaces.SnapshotStack) []string {
+func (i InitializationConfig) getSnapshotResourceNames(snapshot interfaces.SnapshotStack) []string {
 	result := make([]string, 0, len(snapshot.Configs))
 	for _, snapshotResource := range snapshot.Configs {
 		result = append(result, snapshotResource.Name)
@@ -54,7 +56,7 @@ func (i initializationConfig) getSnapshotResourceNames(snapshot interfaces.Snaps
 	return result
 }
 
-func (i initializationConfig) wrapConfig(config swarm.Config) activeResource {
+func (i InitializationConfig) wrapConfig(config swarm.Config) ActiveResource {
 	stackID, ok := config.Spec.Annotations.Labels[types.StackLabel]
 	if !ok {
 		stackID = ""
@@ -70,23 +72,26 @@ func (i initializationConfig) wrapConfig(config swarm.Config) activeResource {
 	}
 }
 
-func (i initializationConfig) getKind() interfaces.ReconcileKind {
+// GetKind returns interfaces.ReconcileConfig
+func (i InitializationConfig) GetKind() interfaces.ReconcileKind {
 	return interfaces.ReconcileConfig
 }
 
-func (i initializationConfig) createPlugin(snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) algorithmPlugin {
+// CreatePlugin creates algorithmConfig
+func (i InitializationConfig) CreatePlugin(snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) AlgorithmPlugin {
 	return newAlgorithmPluginConfig(i, snapshot, requestedResource)
 }
 
-func newInitializationSupportConfig(cli interfaces.BackendClient) initializationConfig {
-	return initializationConfig{
+// NewInitializationSupportConfig creates InitializationConfig
+func NewInitializationSupportConfig(cli interfaces.BackendClient) InitializationConfig {
+	return InitializationConfig{
 		cli: cli,
 	}
 }
 
-func newAlgorithmPluginConfig(initConfig initializationConfig, snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) *algorithmConfig {
+func newAlgorithmPluginConfig(initConfig InitializationConfig, snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) *algorithmConfig {
 	result := algorithmConfig{
-		initializationConfig: initConfig,
+		InitializationConfig: initConfig,
 		requestedResource:    requestedResource,
 		stackID:              snapshot.ID,
 		stackSpec:            snapshot.CurrentSpec,
@@ -137,14 +142,15 @@ func (a *algorithmConfig) getSpecifiedResourceNames() []string {
 	return result
 }
 
-func (a *algorithmConfig) getActiveResources() ([]activeResource, error) {
+// GetActiveResources returns ActiveResource array for swarm.Configs belonging to the stack
+func (a *algorithmConfig) GetActiveResources() ([]ActiveResource, error) {
 	configs, err := a.cli.GetConfigs(dockerTypes.ConfigListOptions{
 		Filters: stackLabelFilter(a.stackID),
 	})
 	if err != nil {
-		return []activeResource{}, err
+		return []ActiveResource{}, err
 	}
-	result := make([]activeResource, 0, len(configs))
+	result := make([]ActiveResource, 0, len(configs))
 	for _, config := range configs {
 		result = append(result, a.wrapConfig(config))
 	}
@@ -169,17 +175,17 @@ func (a *algorithmConfig) addCreateResourceGoal(specName string) *interfaces.Rec
 			Name: configSpec.Annotations.Name,
 		},
 		Config: configSpec,
-		Kind:   a.getKind(),
+		Kind:   a.GetKind(),
 	}
 	a.goals[specName] = resource
 	return resource
 }
 
-func (a *algorithmConfig) addRemoveResourceGoal(activeResource activeResource) *interfaces.ReconcileResource {
+func (a *algorithmConfig) addRemoveResourceGoal(activeResource ActiveResource) *interfaces.ReconcileResource {
 	activeConfig := activeResource.(activeConfig)
 	resource := &interfaces.ReconcileResource{
 		SnapshotResource: activeConfig.SnapshotResource,
-		Kind:             a.getKind(),
+		Kind:             a.GetKind(),
 		Config:           activeConfig.config.Spec,
 	}
 	a.goals[activeConfig.Name] = resource
@@ -209,7 +215,7 @@ func (a *algorithmConfig) storeGoals(previous interfaces.SnapshotStack) (interfa
 	return current, nil
 }
 
-func (a *algorithmConfig) hasSameConfiguration(resource interfaces.ReconcileResource, actual activeResource) bool {
+func (a *algorithmConfig) hasSameConfiguration(resource interfaces.ReconcileResource, actual ActiveResource) bool {
 	one := resource.Config.(*swarm.ConfigSpec)
 	two := actual.(activeConfig).config.Spec
 	return one.Annotations.Name == two.Annotations.Name &&
@@ -218,7 +224,7 @@ func (a *algorithmConfig) hasSameConfiguration(resource interfaces.ReconcileReso
 		reflect.DeepEqual(one.Templating, two.Templating)
 }
 
-func (a *algorithmConfig) createResource(resource *interfaces.ReconcileResource) error {
+func (a *algorithmConfig) CreateResource(resource *interfaces.ReconcileResource) error {
 	configSpec := resource.Config.(*swarm.ConfigSpec)
 	if configSpec.Annotations.Labels == nil {
 		configSpec.Annotations.Labels = map[string]string{}
@@ -232,7 +238,7 @@ func (a *algorithmConfig) createResource(resource *interfaces.ReconcileResource)
 	return nil
 }
 
-func (a *algorithmConfig) deleteResource(resource *interfaces.ReconcileResource) error {
+func (a *algorithmConfig) DeleteResource(resource *interfaces.ReconcileResource) error {
 	err := a.cli.RemoveConfig(resource.ID)
 	// Ignore not found error
 	if err != nil && !errdefs.IsNotFound(err) {
@@ -242,7 +248,7 @@ func (a *algorithmConfig) deleteResource(resource *interfaces.ReconcileResource)
 	return nil
 }
 
-func (a *algorithmConfig) updateResource(resource interfaces.ReconcileResource) error {
+func (a *algorithmConfig) UpdateResource(resource interfaces.ReconcileResource) error {
 	// the response from UpdateConfig is irrelevant
 	err := a.cli.UpdateConfig(
 		resource.ID,

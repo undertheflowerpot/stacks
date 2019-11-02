@@ -14,27 +14,29 @@ type activeNetwork struct {
 	stackID string
 }
 
-type initializationNetwork struct {
+// InitializationNetwork is the InitializationSupport variant for dockerTypes.NetworkResource
+type InitializationNetwork struct {
 	cli interfaces.BackendClient
 }
 
 type algorithmNetwork struct {
-	initializationNetwork
+	InitializationNetwork
 	requestedResource *interfaces.ReconcileResource
 	stackID           string
 	stackSpec         types.StackSpec
 	goals             map[string]*interfaces.ReconcileResource
 }
 
-func (a activeNetwork) getSnapshot() interfaces.SnapshotResource {
+func (a activeNetwork) GetSnapshot() interfaces.SnapshotResource {
 	return a.SnapshotResource
 }
 
-func (a activeNetwork) getStackID() string {
+func (a activeNetwork) GetStackID() string {
 	return a.stackID
 }
 
-func (i initializationNetwork) getActiveResource(resource interfaces.ReconcileResource) (activeResource, error) {
+// GetActiveResource returns ActiveResource for dockerTypes.NetworkResource in interfaces.ReconcileResource
+func (i InitializationNetwork) GetActiveResource(resource interfaces.ReconcileResource) (ActiveResource, error) {
 	network, err := i.cli.GetNetwork(resource.ID)
 	if err != nil {
 		return activeNetwork{}, err
@@ -42,7 +44,7 @@ func (i initializationNetwork) getActiveResource(resource interfaces.ReconcileRe
 	return i.wrapNetwork(network), nil
 }
 
-func (i initializationNetwork) getSnapshotResourceNames(snapshot interfaces.SnapshotStack) []string {
+func (i InitializationNetwork) getSnapshotResourceNames(snapshot interfaces.SnapshotStack) []string {
 	result := make([]string, 0, len(snapshot.Networks))
 	for _, snapshotResource := range snapshot.Networks {
 		result = append(result, snapshotResource.Name)
@@ -50,7 +52,7 @@ func (i initializationNetwork) getSnapshotResourceNames(snapshot interfaces.Snap
 	return result
 }
 
-func (i initializationNetwork) wrapNetwork(network dockerTypes.NetworkResource) activeResource {
+func (i InitializationNetwork) wrapNetwork(network dockerTypes.NetworkResource) ActiveResource {
 	stackID, ok := network.Labels[types.StackLabel]
 	if !ok {
 		stackID = ""
@@ -66,24 +68,27 @@ func (i initializationNetwork) wrapNetwork(network dockerTypes.NetworkResource) 
 	}
 }
 
-func (i initializationNetwork) getKind() interfaces.ReconcileKind {
+// GetKind returns interfaces.ReconcileNetwork
+func (i InitializationNetwork) GetKind() interfaces.ReconcileKind {
 	return interfaces.ReconcileNetwork
 }
 
-func (i initializationNetwork) createPlugin(snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) algorithmPlugin {
+// CreatePlugin creates algorithmNetwork
+func (i InitializationNetwork) CreatePlugin(snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) AlgorithmPlugin {
 	return newAlgorithmPluginNetwork(i, snapshot, requestedResource)
 }
 
-func newInitializationSupportNetwork(cli interfaces.BackendClient) initializationNetwork {
-	return initializationNetwork{
+// NewInitializationSupportNetwork creates InitializationNetwork
+func NewInitializationSupportNetwork(cli interfaces.BackendClient) InitializationNetwork {
+	return InitializationNetwork{
 		cli: cli,
 	}
 }
 
-func newAlgorithmPluginNetwork(networkInit initializationNetwork, snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) *algorithmNetwork {
+func newAlgorithmPluginNetwork(networkInit InitializationNetwork, snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) *algorithmNetwork {
 	result := algorithmNetwork{
 		requestedResource:     requestedResource,
-		initializationNetwork: networkInit,
+		InitializationNetwork: networkInit,
 		stackID:               snapshot.ID,
 		stackSpec:             snapshot.CurrentSpec,
 		goals:                 map[string]*interfaces.ReconcileResource{},
@@ -136,12 +141,13 @@ func (a *algorithmNetwork) getSpecifiedResourceNames() []string {
 	return result
 }
 
-func (a *algorithmNetwork) getActiveResources() ([]activeResource, error) {
+// GetActiveResources returns ActiveResource array for dockerTypes.NetworkResources belonging to the stack
+func (a *algorithmNetwork) GetActiveResources() ([]ActiveResource, error) {
 	networks, err := a.cli.GetNetworks(stackLabelFilter(a.stackID))
 	if err != nil {
-		return []activeResource{}, err
+		return []ActiveResource{}, err
 	}
-	result := make([]activeResource, 0, len(networks))
+	result := make([]ActiveResource, 0, len(networks))
 	for _, network := range networks {
 		result = append(result, a.wrapNetwork(network))
 	}
@@ -166,17 +172,17 @@ func (a *algorithmNetwork) addCreateResourceGoal(specName string) *interfaces.Re
 			Name: networkCreateRequest.Name,
 		},
 		Config: networkCreateRequest,
-		Kind:   a.getKind(),
+		Kind:   a.GetKind(),
 	}
 	a.goals[specName] = resource
 	return resource
 }
 
-func (a *algorithmNetwork) addRemoveResourceGoal(activeResource activeResource) *interfaces.ReconcileResource {
+func (a *algorithmNetwork) addRemoveResourceGoal(activeResource ActiveResource) *interfaces.ReconcileResource {
 	activeNetwork := activeResource.(activeNetwork)
 	resource := &interfaces.ReconcileResource{
 		SnapshotResource: activeNetwork.SnapshotResource,
-		Kind:             a.getKind(),
+		Kind:             a.GetKind(),
 		Config:           a.lookupNetworkSpec(activeNetwork.Name),
 	}
 	a.goals[activeNetwork.Name] = resource
@@ -206,7 +212,7 @@ func (a *algorithmNetwork) storeGoals(previous interfaces.SnapshotStack) (interf
 	return current, nil
 }
 
-func (a *algorithmNetwork) hasSameConfiguration(resource interfaces.ReconcileResource, actual activeResource) bool {
+func (a *algorithmNetwork) hasSameConfiguration(resource interfaces.ReconcileResource, actual ActiveResource) bool {
 	// FIXME: Since Networks cannot be updated, is it still useful to
 	// compare the original configuration and the current configuration
 	/*
@@ -216,7 +222,7 @@ func (a *algorithmNetwork) hasSameConfiguration(resource interfaces.ReconcileRes
 	return true
 }
 
-func (a *algorithmNetwork) createResource(resource *interfaces.ReconcileResource) error {
+func (a *algorithmNetwork) CreateResource(resource *interfaces.ReconcileResource) error {
 	networkCreateRequest := resource.Config.(*dockerTypes.NetworkCreateRequest)
 	if networkCreateRequest.NetworkCreate.Labels == nil {
 		networkCreateRequest.NetworkCreate.Labels = map[string]string{}
@@ -230,7 +236,7 @@ func (a *algorithmNetwork) createResource(resource *interfaces.ReconcileResource
 	return nil
 }
 
-func (a *algorithmNetwork) deleteResource(resource *interfaces.ReconcileResource) error {
+func (a *algorithmNetwork) DeleteResource(resource *interfaces.ReconcileResource) error {
 	err := a.cli.RemoveNetwork(resource.ID)
 	// Ignore not found error
 	if err != nil && !errdefs.IsNotFound(err) {
@@ -240,6 +246,6 @@ func (a *algorithmNetwork) deleteResource(resource *interfaces.ReconcileResource
 	return nil
 }
 
-func (a *algorithmNetwork) updateResource(resource interfaces.ReconcileResource) error {
+func (a *algorithmNetwork) UpdateResource(resource interfaces.ReconcileResource) error {
 	return nil
 }

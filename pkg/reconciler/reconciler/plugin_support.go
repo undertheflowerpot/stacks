@@ -61,12 +61,12 @@ func selectMark(requestedResource *interfaces.ReconcileResource, target interfac
 	return interfaces.ReconcileSkip
 }
 
-func transform(resource interfaces.SnapshotResource, plugin algorithmPlugin) *interfaces.ReconcileResource {
+func transform(resource interfaces.SnapshotResource, plugin AlgorithmPlugin) *interfaces.ReconcileResource {
 	newResource := interfaces.ReconcileResource{
 		SnapshotResource: resource,
-		Kind:             plugin.getKind(),
+		Kind:             plugin.GetKind(),
 		Config:           plugin.lookupSpecifiedResource(resource.Name),
-		Mark:             selectMark(plugin.getRequestedResource(), resource, plugin.getKind()),
+		Mark:             selectMark(plugin.getRequestedResource(), resource, plugin.GetKind()),
 	}
 	return &newResource
 }

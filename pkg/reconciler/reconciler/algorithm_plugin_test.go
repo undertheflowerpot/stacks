@@ -11,7 +11,7 @@ import (
 
 var _ = Describe("Algorithm Plugin for Service - Stack Request", func() {
 	var (
-		serviceInit    initializationService
+		serviceInit    InitializationService
 		stack          types.Stack
 		input          AlgorithmPluginInputs
 		err1, err2     error
@@ -20,7 +20,7 @@ var _ = Describe("Algorithm Plugin for Service - Stack Request", func() {
 	)
 	BeforeEach(func() {
 		input.cli = fakes.NewFakeReconcilerClient()
-		serviceInit = newInitializationSupportService(input.cli)
+		serviceInit = NewInitializationSupportService(input.cli)
 		stack = fakes.GetTestStack("stack12")
 		input.stack = &stack
 		input.algorithmInit = serviceInit
@@ -79,7 +79,7 @@ var _ = Describe("Algorithm Plugin for Service - Stack Request", func() {
 			// Manual alteration of underlying service
 			input.stack.Spec.Services[0].UpdateConfig =
 				&swarm.UpdateConfig{}
-			service, _ := input.cli.GetService(input.activeResource.getSnapshot().ID,
+			service, _ := input.cli.GetService(input.activeResource.GetSnapshot().ID,
 						interfaces.DefaultGetServiceArg2)
 			input.cli.UpdateService(service.ID,
 						service.Meta.Version.Index,
@@ -98,7 +98,7 @@ var _ = Describe("Algorithm Plugin for Service - Stack Request", func() {
 
 var _ = Describe("Algorithm Plugin for Config - Stack Request", func() {
 	var (
-		configInit    initializationConfig
+		configInit    InitializationConfig
 		stack         types.Stack
 		input         AlgorithmPluginInputs
 		err1, err2    error
@@ -107,7 +107,7 @@ var _ = Describe("Algorithm Plugin for Config - Stack Request", func() {
 	)
 	BeforeEach(func() {
 		input.cli = fakes.NewFakeReconcilerClient()
-		configInit = newInitializationSupportConfig(input.cli)
+		configInit = NewInitializationSupportConfig(input.cli)
 		stack = fakes.GetTestStack("stack12")
 		input.stack = &stack
 		input.algorithmInit = configInit
@@ -162,7 +162,7 @@ var _ = Describe("Algorithm Plugin for Config - Stack Request", func() {
 
 var _ = Describe("Algorithm Plugin for Secret - Stack Request", func() {
 	var (
-		secretInit    initializationSecret
+		secretInit    InitializationSecret
 		stack         types.Stack
 		input         AlgorithmPluginInputs
 		err1, err2    error
@@ -171,7 +171,7 @@ var _ = Describe("Algorithm Plugin for Secret - Stack Request", func() {
 	)
 	BeforeEach(func() {
 		input.cli = fakes.NewFakeReconcilerClient()
-		secretInit = newInitializationSupportSecret(input.cli)
+		secretInit = NewInitializationSupportSecret(input.cli)
 		stack = fakes.GetTestStack("stack12")
 		input.stack = &stack
 		input.algorithmInit = secretInit
@@ -215,8 +215,8 @@ var _ = Describe("Algorithm Plugin for Secret - Stack Request", func() {
 							secretSupport := newAlgorithmPluginSecret(secretInit, snapshot, input.request)
 							input.resourcePlugin = secretSupport
 							input.resource = secretSupport.getGoalResource(input.resource.Name)
-							act, _ := secretSupport.getActiveResource(*input.resource)
-							input.resource.Meta = act.getSnapshot().Meta
+							act, _ := secretSupport.GetActiveResource(*input.resource)
+							input.resource.Meta = act.GetSnapshot().Meta
 							Expect(input.resource).ToNot(BeNil())
 						})
 						ManuallyReconcileUpdateGoal(&input)
@@ -236,7 +236,7 @@ var _ = Describe("Algorithm Plugin for Secret - Stack Request", func() {
 
 var _ = Describe("Algorithm Plugin for Network - Stack Request", func() {
 	var (
-		networkInit    initializationNetwork
+		networkInit    InitializationNetwork
 		stack          types.Stack
 		input          AlgorithmPluginInputs
 		err1, err2     error
@@ -245,7 +245,7 @@ var _ = Describe("Algorithm Plugin for Network - Stack Request", func() {
 	)
 	BeforeEach(func() {
 		input.cli = fakes.NewFakeReconcilerClient()
-		networkInit = newInitializationSupportNetwork(input.cli)
+		networkInit = NewInitializationSupportNetwork(input.cli)
 		stack = fakes.GetTestStack("stack12")
 		input.stack = &stack
 		input.algorithmInit = networkInit

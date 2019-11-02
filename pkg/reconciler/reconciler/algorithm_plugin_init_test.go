@@ -14,7 +14,7 @@ import (
 var _ = Describe("Initial Algorithm Support - Service", func() {
 	var (
 		cli         *fakes.FakeReconcilerClient
-		serviceInit initializationService
+		serviceInit InitializationService
 		inputs      AlgorithmPluginInputs
 		resources   []swarm.Service
 		err         error
@@ -22,7 +22,7 @@ var _ = Describe("Initial Algorithm Support - Service", func() {
 	BeforeEach(func() {
 		var resp1, resp2 *dockerTypes.ServiceCreateResponse
 		cli = fakes.NewFakeReconcilerClient()
-		serviceInit = newInitializationSupportService(cli)
+		serviceInit = NewInitializationSupportService(cli)
 		// testing two services one with a stacks label and
 		// one without skipping zero-th element
 		resources = fakes.GenerateServiceFixtures(3, "", "InitialService")
@@ -46,7 +46,7 @@ var _ = Describe("Initial Algorithm Support - Service", func() {
 	When("Uncreated resources", func() {
 		BeforeEach(func() {
 			badsearch := interfaces.ReconcileResource{}
-			inputs.activeResource1, err = serviceInit.getActiveResource(badsearch)
+			inputs.activeResource1, err = serviceInit.GetActiveResource(badsearch)
 		})
 		It("mean active resources do not exist", func() {
 			Expect(err).To(HaveOccurred())
@@ -67,7 +67,7 @@ var _ = Describe("Initial Algorithm Support - Service", func() {
 var _ = Describe("Initial Algorithm Support - Config", func() {
 	var (
 		cli        *fakes.FakeReconcilerClient
-		configInit initializationConfig
+		configInit InitializationConfig
 		inputs     AlgorithmPluginInputs
 		resources  []swarm.Config
 		err        error
@@ -75,7 +75,7 @@ var _ = Describe("Initial Algorithm Support - Config", func() {
 	BeforeEach(func() {
 		var id1, id2 string
 		cli = fakes.NewFakeReconcilerClient()
-		configInit = newInitializationSupportConfig(cli)
+		configInit = NewInitializationSupportConfig(cli)
 		// testing two configs one with a stacks label and
 		// one without skipping zero-th element
 		resources = fakes.GenerateConfigFixtures(3, "", "InitialConfig")
@@ -95,7 +95,7 @@ var _ = Describe("Initial Algorithm Support - Config", func() {
 	When("Uncreated resources", func() {
 		BeforeEach(func() {
 			badsearch := interfaces.ReconcileResource{}
-			inputs.activeResource1, err = configInit.getActiveResource(badsearch)
+			inputs.activeResource1, err = configInit.GetActiveResource(badsearch)
 		})
 		It("mean active resources do not exist", func() {
 			Expect(err).To(HaveOccurred())
@@ -116,7 +116,7 @@ var _ = Describe("Initial Algorithm Support - Config", func() {
 var _ = Describe("Initial Algorithm Support - Secret", func() {
 	var (
 		cli        *fakes.FakeReconcilerClient
-		secretInit initializationSecret
+		secretInit InitializationSecret
 		inputs     AlgorithmPluginInputs
 		resources  []swarm.Secret
 		err        error
@@ -124,7 +124,7 @@ var _ = Describe("Initial Algorithm Support - Secret", func() {
 	BeforeEach(func() {
 		var id1, id2 string
 		cli = fakes.NewFakeReconcilerClient()
-		secretInit = newInitializationSupportSecret(cli)
+		secretInit = NewInitializationSupportSecret(cli)
 		// testing two secrets one with a stacks label and
 		// one without skipping zero-th element
 		resources = fakes.GenerateSecretFixtures(3, "", "InitialSecret")
@@ -144,7 +144,7 @@ var _ = Describe("Initial Algorithm Support - Secret", func() {
 	When("Uncreated resources", func() {
 		BeforeEach(func() {
 			badsearch := interfaces.ReconcileResource{}
-			inputs.activeResource1, err = secretInit.getActiveResource(badsearch)
+			inputs.activeResource1, err = secretInit.GetActiveResource(badsearch)
 		})
 		It("mean active resources do not exist", func() {
 			Expect(err).To(HaveOccurred())
@@ -165,7 +165,7 @@ var _ = Describe("Initial Algorithm Support - Secret", func() {
 var _ = Describe("Initial Algorithm Support - Network", func() {
 	var (
 		cli         *fakes.FakeReconcilerClient
-		networkInit initializationNetwork
+		networkInit InitializationNetwork
 		inputs      AlgorithmPluginInputs
 		resources   []dockerTypes.NetworkCreateRequest
 		err         error
@@ -173,7 +173,7 @@ var _ = Describe("Initial Algorithm Support - Network", func() {
 	BeforeEach(func() {
 		var id1, id2 string
 		cli = fakes.NewFakeReconcilerClient()
-		networkInit = newInitializationSupportNetwork(cli)
+		networkInit = NewInitializationSupportNetwork(cli)
 		// testing two networks one with a stacks label and
 		// one without skipping zero-th element
 		resources = fakes.GenerateNetworkFixtures(3, "", "InitialNetwork")
@@ -193,7 +193,7 @@ var _ = Describe("Initial Algorithm Support - Network", func() {
 	When("Uncreated resources", func() {
 		BeforeEach(func() {
 			badsearch := interfaces.ReconcileResource{}
-			inputs.activeResource1, err = networkInit.getActiveResource(badsearch)
+			inputs.activeResource1, err = networkInit.GetActiveResource(badsearch)
 		})
 		It("mean active resources do not exist", func() {
 			Expect(err).To(HaveOccurred())

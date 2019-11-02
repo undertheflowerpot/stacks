@@ -17,27 +17,29 @@ type activeService struct {
 	stackID string
 }
 
-type initializationService struct {
+// InitializationService is the InitializationSupport variant for swarm.Service
+type InitializationService struct {
 	cli interfaces.BackendClient
 }
 
 type algorithmService struct {
-	initializationService
+	InitializationService
 	requestedResource *interfaces.ReconcileResource
 	stackID           string
 	stackSpec         types.StackSpec
 	goals             map[string]*interfaces.ReconcileResource
 }
 
-func (a activeService) getSnapshot() interfaces.SnapshotResource {
+func (a activeService) GetSnapshot() interfaces.SnapshotResource {
 	return a.SnapshotResource
 }
 
-func (a activeService) getStackID() string {
+func (a activeService) GetStackID() string {
 	return a.stackID
 }
 
-func (i initializationService) getActiveResource(resource interfaces.ReconcileResource) (activeResource, error) {
+// GetActiveResource returns ActiveResource for swarm.Service in interfaces.ReconcileResource
+func (i InitializationService) GetActiveResource(resource interfaces.ReconcileResource) (ActiveResource, error) {
 	service, err := i.cli.GetService(resource.ID, interfaces.DefaultGetServiceArg2)
 	if err != nil {
 		return activeService{}, err
@@ -45,7 +47,7 @@ func (i initializationService) getActiveResource(resource interfaces.ReconcileRe
 	return i.wrapService(service), nil
 }
 
-func (i initializationService) getSnapshotResourceNames(snapshot interfaces.SnapshotStack) []string {
+func (i InitializationService) getSnapshotResourceNames(snapshot interfaces.SnapshotStack) []string {
 	result := make([]string, 0, len(snapshot.Services))
 	for _, snapshotResource := range snapshot.Services {
 		result = append(result, snapshotResource.Name)
@@ -53,7 +55,7 @@ func (i initializationService) getSnapshotResourceNames(snapshot interfaces.Snap
 	return result
 }
 
-func (i initializationService) wrapService(service swarm.Service) activeResource {
+func (i InitializationService) wrapService(service swarm.Service) ActiveResource {
 	stackID, ok := service.Spec.Annotations.Labels[types.StackLabel]
 	if !ok {
 		stackID = ""
@@ -69,23 +71,26 @@ func (i initializationService) wrapService(service swarm.Service) activeResource
 	}
 }
 
-func (i initializationService) getKind() interfaces.ReconcileKind {
+// GetKind returns interfaces.ReconcileService
+func (i InitializationService) GetKind() interfaces.ReconcileKind {
 	return interfaces.ReconcileService
 }
 
-func (i initializationService) createPlugin(snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) algorithmPlugin {
+// CreatePlugin creates algorithmService
+func (i InitializationService) CreatePlugin(snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) AlgorithmPlugin {
 	return newAlgorithmPluginService(i, snapshot, requestedResource)
 }
 
-func newInitializationSupportService(cli interfaces.BackendClient) initializationService {
-	return initializationService{
+// NewInitializationSupportService creates InitializationService
+func NewInitializationSupportService(cli interfaces.BackendClient) InitializationService {
+	return InitializationService{
 		cli: cli,
 	}
 }
 
-func newAlgorithmPluginService(initService initializationService, snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) *algorithmService {
+func newAlgorithmPluginService(initService InitializationService, snapshot interfaces.SnapshotStack, requestedResource *interfaces.ReconcileResource) *algorithmService {
 	result := algorithmService{
-		initializationService: initService,
+		InitializationService: initService,
 		requestedResource:     requestedResource,
 		stackID:               snapshot.ID,
 		stackSpec:             snapshot.CurrentSpec,
@@ -136,14 +141,15 @@ func (a *algorithmService) getSpecifiedResourceNames() []string {
 	return result
 }
 
-func (a *algorithmService) getActiveResources() ([]activeResource, error) {
+// GetActiveResources returns ActiveResource array for swarm.Services belonging to the stack
+func (a *algorithmService) GetActiveResources() ([]ActiveResource, error) {
 	services, err := a.cli.GetServices(dockerTypes.ServiceListOptions{
 		Filters: stackLabelFilter(a.stackID),
 	})
 	if err != nil {
-		return []activeResource{}, err
+		return []ActiveResource{}, err
 	}
-	result := make([]activeResource, 0, len(services))
+	result := make([]ActiveResource, 0, len(services))
 	for _, service := range services {
 		result = append(result, a.wrapService(service))
 	}
@@ -168,17 +174,17 @@ func (a *algorithmService) addCreateResourceGoal(specName string) *interfaces.Re
 			Name: serviceSpec.Annotations.Name,
 		},
 		Config: serviceSpec,
-		Kind:   a.getKind(),
+		Kind:   a.GetKind(),
 	}
 	a.goals[specName] = resource
 	return resource
 }
 
-func (a *algorithmService) addRemoveResourceGoal(activeResource activeResource) *interfaces.ReconcileResource {
+func (a *algorithmService) addRemoveResourceGoal(activeResource ActiveResource) *interfaces.ReconcileResource {
 	activeService := activeResource.(activeService)
 	resource := &interfaces.ReconcileResource{
 		SnapshotResource: activeService.SnapshotResource,
-		Kind:             a.getKind(),
+		Kind:             a.GetKind(),
 		Config:           activeService.service.Spec,
 	}
 	a.goals[activeService.Name] = resource
@@ -208,7 +214,7 @@ func (a *algorithmService) storeGoals(previous interfaces.SnapshotStack) (interf
 	return current, nil
 }
 
-func (a *algorithmService) hasSameConfiguration(resource interfaces.ReconcileResource, actual activeResource) bool {
+func (a *algorithmService) hasSameConfiguration(resource interfaces.ReconcileResource, actual ActiveResource) bool {
 	one := resource.Config.(*swarm.ServiceSpec)
 	two := actual.(activeService).service.Spec
 	return one.Annotations.Name == two.Annotations.Name &&
@@ -221,7 +227,7 @@ func (a *algorithmService) hasSameConfiguration(resource interfaces.ReconcileRes
 		reflect.DeepEqual(one.EndpointSpec, two.EndpointSpec)
 }
 
-func (a *algorithmService) createResource(resource *interfaces.ReconcileResource) error {
+func (a *algorithmService) CreateResource(resource *interfaces.ReconcileResource) error {
 	serviceSpec := resource.Config.(*swarm.ServiceSpec)
 	if serviceSpec.Annotations.Labels == nil {
 		serviceSpec.Annotations.Labels = map[string]string{}
@@ -237,7 +243,7 @@ func (a *algorithmService) createResource(resource *interfaces.ReconcileResource
 	return nil
 }
 
-func (a *algorithmService) deleteResource(resource *interfaces.ReconcileResource) error {
+func (a *algorithmService) DeleteResource(resource *interfaces.ReconcileResource) error {
 	err := a.cli.RemoveService(resource.ID)
 	// Ignore not found error
 	if err != nil && !errdefs.IsNotFound(err) {
@@ -247,7 +253,7 @@ func (a *algorithmService) deleteResource(resource *interfaces.ReconcileResource
 	return nil
 }
 
-func (a *algorithmService) updateResource(resource interfaces.ReconcileResource) error {
+func (a *algorithmService) UpdateResource(resource interfaces.ReconcileResource) error {
 	// the response from UpdateService is irrelevant
 	_, err := a.cli.UpdateService(
 		resource.ID,
