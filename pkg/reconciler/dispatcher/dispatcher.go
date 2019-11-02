@@ -1,13 +1,11 @@
 package dispatcher
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/errdefs"
 
 	"github.com/docker/stacks/pkg/interfaces"
 	"github.com/docker/stacks/pkg/reconciler/notifier"
@@ -69,10 +67,10 @@ func newDispatcher(r reconciler.Reconciler, register notifier.Register) *dispatc
 }
 
 // NewRequest creates a new request to reconcile a resource
-func NewRequest(kind, ID string) (*interfaces.ReconcileResource, error) {
+func NewRequest(kind, ID string) *interfaces.ReconcileResource {
 	reconcileKind := kind
 	if _, ok := interfaces.ReconcileKinds[reconcileKind]; !ok {
-		return nil, errdefs.NotFound(fmt.Errorf("Resource kind %s not found", kind))
+		return nil
 	}
 
 	result := interfaces.ReconcileResource{
@@ -81,7 +79,7 @@ func NewRequest(kind, ID string) (*interfaces.ReconcileResource, error) {
 		},
 		Kind: reconcileKind,
 	}
-	return &result, nil
+	return &result
 }
 
 // Notify tells the dispatcher to call the reconciler with this object at some
@@ -139,10 +137,11 @@ func (d *dispatcher) HandleEvents(eventC chan interface{}) error {
 	//           no objects left   |_______________________|
 	//
 
-	// the whole thing  goes in a for loop
+	// the whole thing goes in a for loop
 	for {
 		// initial state: waiting for a channel read
 		ev, ok := <-eventC
+		logrus.Debugf("Dispatcher received event: %v %v", ok, ev)
 		if !ok {
 			// if the channel is closed, return
 			return nil
@@ -157,6 +156,7 @@ func (d *dispatcher) HandleEvents(eventC chan interface{}) error {
 			// read as long as the channel is ready
 			select {
 			case ev, ok := <-eventC:
+				logrus.Debugf("Dispatcher received event: %v %v", ok, ev)
 				// channel closed, return
 				if !ok {
 					return nil
@@ -194,11 +194,10 @@ func (d *dispatcher) resolveMessage(ev interface{}) error {
 	// panic. This is the desired behavior.
 	msg := ev.(events.Message)
 	// and then just call Notify, it's the same code anyway.
-	request, err := NewRequest(msg.Type, msg.Actor.ID)
-	if err != nil {
-		return err
+	request := NewRequest(msg.Type, msg.Actor.ID)
+	if request != nil {
+		d.Notify(request)
 	}
-	d.Notify(request)
 	return nil
 }
 

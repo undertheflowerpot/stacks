@@ -30,6 +30,10 @@ type StacksBackend interface {
 // methods required to validate, provision and update manipulate Swarm
 // stacks and their referenced resources.
 type SwarmResourceBackend interface {
+	SwarmNetworkBackend
+	SwarmConfigBackend
+	SwarmSecretBackend
+	SwarmServiceBackend
 	// Info isn't actually in the swarm.Backend interface, but it is defined on
 	// the Cluster object, which provides the rest of the implementation
 	Info() swarm.Info
@@ -88,10 +92,6 @@ type BackendClient interface {
 	StacksBackend
 
 	SwarmResourceBackend
-	SwarmNetworkBackend
-	SwarmConfigBackend
-	SwarmSecretBackend
-	SwarmServiceBackend
 
 	// SubscribeToEvents and UnsubscribeFromEvents are part of the
 	// system.Backend interface.

@@ -25,11 +25,22 @@ type ServerOptions struct {
 	ServerPort       int
 }
 
-// Server initializes and runs a standalone http Server that serves the Stacks
+// ServerControl makes it possible to pass control of the standalone
+// httpserver to Ginko tests.
+type ServerControl struct {
+	StackStore           *fakes.FakeStackStore
+	SwarmResourceBackend interfaces.SwarmResourceBackend
+	StacksBackend        *backend.DefaultStacksBackend
+	BackendClient        interfaces.BackendClient
+	ReconcilerManager    *reconciler.Manager
+	Server               *http.Server
+}
+
+// CreateServer initializes a standalone http Server that serves the Stacks
 // API, and sets up the Stacks reconciler. A docker API client, accessible as a
 // unix socket via the DockerSocketPath option, provides access to the
 // downstream set of Swarmkit required for the reconciler.
-func Server(opts ServerOptions) error {
+func CreateServer(opts ServerOptions) (*ServerControl, error) {
 	if opts.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
@@ -37,49 +48,56 @@ func Server(opts ServerOptions) error {
 	// Create an unauthenticated docker client
 	dclient, err := client.NewClient(fmt.Sprintf("unix://%s", opts.DockerSocketPath), "", nil, nil)
 	if err != nil {
-		return fmt.Errorf("unable to create docker client for unix socket at %s: %s", opts.DockerSocketPath, err)
+		return nil, fmt.Errorf("unable to create docker client for unix socket at %s: %s", opts.DockerSocketPath, err)
 	}
+
+	s := ServerControl{}
 
 	// Create a shim for the SwarmResourceBackend interface using the docker client.
 	// This shim is used to access swarm resources by the Stacks API handlers
 	// for validation and conversion purposes.
-	swarmResourceBackend := interfaces.NewSwarmAPIClientShim(dclient)
+	s.SwarmResourceBackend = interfaces.NewSwarmAPIClientShim(dclient)
 
 	// Create the underlying storage for stacks and swarmstacks as an
 	// in-memory store.
-	stackStore := fakes.NewFakeStackStore()
+	s.StackStore = fakes.NewFakeStackStore()
 
 	// Create a Stacks API Backend, which includes the API handling logic.
-	stacksBackend := backend.NewDefaultStacksBackend(stackStore, swarmResourceBackend)
+	s.StacksBackend = backend.NewDefaultStacksBackend(s.StackStore, s.SwarmResourceBackend)
 
 	// Create a BackendClient shim for the reconciler
-	backendClient := interfaces.NewBackendAPIClientShim(dclient, stacksBackend)
+	s.BackendClient = interfaces.NewBackendAPIClientShim(dclient, s.StacksBackend)
 
-	// Create the reconciler manager
-	reconcilerManager := reconciler.New(backendClient)
+	// Create the reconciler
+	s.ReconcilerManager = reconciler.New(s.BackendClient)
 
 	// Create a Stacks API Router, which includes basic HTTP handlers
 	// for the Stacks APIs. This is wired up against the backendClient
 	// so that the API can trigger stack events.
-	r := stacksRouter.NewRouter(backendClient)
+	r := stacksRouter.NewRouter(s.BackendClient)
 
-	errChan := make(chan error)
-
-	server := &http.Server{
+	s.Server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", opts.ServerPort),
 		Handler: registerRoutes(r),
 	}
+	return &s, nil
+}
+
+// RunServer takes the Server created from CreateServer and starts the
+// goroutines to run the httpserver
+func (s *ServerControl) RunServer() error {
+	errChan := make(chan error)
 
 	// Launch the reconciler in a goroutine
 	go func() {
 		logrus.Infof("Starting Swarm Stacks reconciler")
-		errChan <- reconcilerManager.Run()
+		errChan <- s.ReconcilerManager.Run()
 	}()
 
 	// Launch the HTTP server in a goroutine
 	go func() {
 		logrus.Infof("Running standalone Stacks API server")
-		errChan <- server.ListenAndServe()
+		errChan <- s.Server.ListenAndServe()
 	}()
 
 	return <-errChan

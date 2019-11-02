@@ -25,10 +25,6 @@ type BackendAPIClientShim struct {
 	StacksBackend
 
 	SwarmResourceBackend
-	SwarmNetworkBackend
-	SwarmConfigBackend
-	SwarmSecretBackend
-	SwarmServiceBackend
 
 	// The following constructs are used to generate events for stack
 	// operations locally, and multiplex them into the daemon's event stream.
@@ -53,17 +49,20 @@ func NewBackendAPIClientShim(dclient client.CommonAPIClient, backend StacksBacke
 // thus even past are provided through the returned channel.
 func (c *BackendAPIClientShim) SubscribeToEvents(since, until time.Time, ef filters.Args) ([]events.Message, chan interface{}) {
 	ctx, cancel := context.WithCancel(context.Background())
+	logrus.Infof("SHIM:SubscribeToEvents since=%v until=%v", since, until)
 
 	resChan := make(chan interface{})
-	eventsChan, _ := c.dclient.Events(context.Background(), dockerTypes.EventsOptions{
+	eventsChan, errChan := c.dclient.Events(context.Background(), dockerTypes.EventsOptions{
 		Filters: ef,
-		Since:   fmt.Sprintf("%d", since.Unix()),
-		Until:   fmt.Sprintf("%d", until.Unix()),
+		//		Since:   fmt.Sprintf("%d", since.Unix()),
+		//		Until:   fmt.Sprintf("%d", until.Unix()),
 	})
 
 	go func() {
 		for {
 			select {
+			case err := <-errChan:
+				logrus.Errorf("SHIM:SubscribeToEvents daemon error: %v", err)
 			case event := <-c.stackEvents:
 				resChan <- event
 			case event := <-eventsChan:
@@ -100,15 +99,16 @@ func (c *BackendAPIClientShim) CreateStack(create types.StackSpec) (types.StackC
 	}
 
 	go func() {
-		logrus.Debugf("writing stack create event")
-		c.stackEvents <- events.Message{
+		ev := events.Message{
 			Type:   "stack",
 			Action: "create",
 			Actor: events.Actor{
 				ID: response.ID,
 			},
 		}
-		logrus.Debugf("wrote stack create event")
+		logrus.Debugf("SHIM:CreateStack writing event: %v", ev)
+		c.stackEvents <- ev
+		logrus.Debugf("SHIM:CreateStack wrote event")
 	}()
 
 	return response, err
@@ -118,15 +118,16 @@ func (c *BackendAPIClientShim) CreateStack(create types.StackSpec) (types.StackC
 func (c *BackendAPIClientShim) UpdateStack(id string, spec types.StackSpec, version uint64) error {
 	err := c.StacksBackend.UpdateStack(id, spec, version)
 	go func() {
-		logrus.Debugf("writing stack update event")
-		c.stackEvents <- events.Message{
+		ev := events.Message{
 			Type:   "stack",
 			Action: "update",
 			Actor: events.Actor{
 				ID: id,
 			},
 		}
-		logrus.Debugf("wrote stack update event")
+		logrus.Debugf("SHIM:UpdateStack writing event: %v", ev)
+		c.stackEvents <- ev
+		logrus.Debugf("SHIM:UpdateStack wrote event")
 	}()
 
 	return err
@@ -136,11 +137,16 @@ func (c *BackendAPIClientShim) UpdateStack(id string, spec types.StackSpec, vers
 func (c *BackendAPIClientShim) DeleteStack(id string) error {
 	err := c.StacksBackend.DeleteStack(id)
 	go func() {
-		c.stackEvents <- events.Message{
+		ev := events.Message{
 			Type:   "stack",
 			Action: "delete",
-			ID:     id,
+			Actor: events.Actor{
+				ID: id,
+			},
 		}
+		logrus.Debugf("SHIM:DeleteStack writing event: %v", ev)
+		c.stackEvents <- ev
+		logrus.Debugf("SHIM:DeleteStack wrote event")
 	}()
 	return err
 }

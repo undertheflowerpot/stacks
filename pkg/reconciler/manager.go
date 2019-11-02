@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 
@@ -82,6 +84,7 @@ func (m *Manager) Run() error {
 		// by the closure in the startOnce
 		err error
 	)
+	logrus.Infof("Manager:Run")
 	m.startOnce.Do(func() {
 		ran = true
 		// start up a loop, where we wait until we become a leader, and then we
@@ -89,7 +92,11 @@ func (m *Manager) Run() error {
 		// closed
 		for {
 			m.waitReady()
+			logrus.Info("Manager:Run became leader, running the manager")
 			err = m.run()
+			if err != nil {
+				logrus.Errorf("Manager:Run error: %v", err)
+			}
 			select {
 			case <-m.stop:
 				return
@@ -139,13 +146,20 @@ func (m *Manager) Stop() {
 // leader. it can be safely re-entered any number of times, and it exits when
 // the node has become the leader, or Stop has been called
 func (m *Manager) waitReady() {
+	logrus.Infof("Manager:waitReady")
+	m.nodeID = m.client.Info().NodeID
+	if m.checkLeadership() {
+		return
+	}
 	// set up a watch for node events
 	f := filters.NewArgs(filters.Arg("type", events.NodeEventType))
 	_, eventC := m.client.SubscribeToEvents(time.Time{}, time.Time{}, f)
+	logrus.Infof("Manager:waitReady SubscribeToEvents completed")
 	defer m.client.UnsubscribeFromEvents(eventC)
 	for {
 		select {
 		case <-m.notifyCluster:
+			logrus.Infof("Manager:waitReady NOTIFY CLUSTER")
 			// the result of Info is not a pointer, so there is no need to nil
 			// check it. Additionally, NodeID will be empty string if there is
 			// no Info object. This handles both the JoinCluster and
@@ -155,6 +169,7 @@ func (m *Manager) waitReady() {
 				return
 			}
 		case ev, ok := <-eventC:
+			logrus.Infof("Manager waitReady event %v %v", ev, ok)
 			// if the channel gets cut off for whatever reason, return.
 			// TODO(dperny): in the "standalone" case, where this is actually
 			// the result of a network socket, this might cause us to start
@@ -168,6 +183,7 @@ func (m *Manager) waitReady() {
 				return
 			}
 		case <-m.stop:
+			logrus.Infof("Manager:waitReady STOP")
 			return
 		}
 	}
@@ -176,6 +192,7 @@ func (m *Manager) waitReady() {
 // checkLeadership is a helper function that checks if this node is currently
 // the leader
 func (m *Manager) checkLeadership() bool {
+	logrus.Infof("Manager:checkLeadership")
 	// we can actually discard the error, because we're only
 	// checking for the existence of a ManagerStatus, which the
 	// default value of swarm.Node will not include
@@ -187,16 +204,20 @@ func (m *Manager) checkLeadership() bool {
 // currently a leader, taking an event to decide whether to actually do API
 // calls.
 func (m *Manager) checkNodeEventLeadership(ev interface{}) bool {
+	logrus.Infof("Manager:checkNodeEventLeadership")
 	msg, ok := ev.(events.Message)
 	// even though we passed a filter for node events, in the interest
 	// of defensive programming, make sure that's really what this is.
 	//
 	// then, check if this message is an update to THIS node. If it is,
 	// we should see if we've become the leader.
-	return ok &&
-		msg.Type == events.NodeEventType &&
-		msg.Actor.ID == m.nodeID &&
-		m.checkLeadership()
+	if !ok {
+		return false
+	}
+	if msg.Type == events.NodeEventType && msg.Actor.ID == m.nodeID {
+		return m.checkLeadership()
+	}
+	return true
 }
 
 // run is the private method that implements the actual logic of running.
@@ -213,6 +234,8 @@ func (m *Manager) run() error {
 	// make sure we unsubscribe from events when we're done. I think if we
 	// don't do this, the channel may leak?
 	defer m.client.UnsubscribeFromEvents(eventC)
+
+	logrus.Infof("Manager:run")
 
 	// now, we want to make sure that the events channel is buffered, for the
 	// benefit of the Dispatcher. The dispatcher is designed such that it
@@ -245,6 +268,7 @@ func (m *Manager) run() error {
 		for {
 			select {
 			case ev, ok := <-eventC:
+				logrus.Infof("Manager:run EVENT: %v, %v", ok, ev)
 				if !ok {
 					// TODO(dperny): what happens if we lose this channel
 					// without asking for it to be shutdown? right now, this
@@ -267,15 +291,18 @@ func (m *Manager) run() error {
 					return
 				}
 			case <-m.notifyCluster:
+				logrus.Infof("Manager:run NOTIFY CLUSTER")
 				if !m.checkLeadership() {
 					return
 				}
 			case <-m.stop:
+				logrus.Infof("Manager:run STOP")
 				return
 			}
 		}
 	}()
 	// now, start handling events in the Dispatcher
+	logrus.Infof("Manager:run HandleEvents")
 	err := m.d.HandleEvents(dispatcherChan)
 	wg.Wait()
 

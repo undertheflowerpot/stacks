@@ -135,7 +135,7 @@ var _ = Describe("Dispatcher", func() {
 				}
 			}
 
-			nr, _ := NewRequest(interfaces.ReconcileStack, "someID")
+			nr := NewRequest(interfaces.ReconcileStack, "someID")
 			// we're expecting only 1 call to Reconcile
 			mockReconciler.EXPECT().Reconcile(
 				gomock.Eq(nr),

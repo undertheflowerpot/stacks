@@ -273,6 +273,7 @@ func GetTestConfigSpec(name string) swarm.ConfigSpec {
 		Annotations: swarm.Annotations{
 			Name: name,
 		},
+		Data: []byte{0},
 	}
 
 	return spec
@@ -315,6 +316,7 @@ func GetTestSecretSpec(name string) swarm.SecretSpec {
 		Annotations: swarm.Annotations{
 			Name: name,
 		},
+		Data: []byte{0},
 	}
 
 	return spec
@@ -350,10 +352,9 @@ func GenerateNetworkFixtures(n int, name, label string) []dockerTypes.NetworkCre
 }
 
 // GetTestNetworkRequest creates a minimal dockerTypes.NetworkCreateRequest
-func GetTestNetworkRequest(name, driver string) dockerTypes.NetworkCreateRequest {
+func GetTestNetworkRequest(name, _ string) dockerTypes.NetworkCreateRequest {
 
 	networkCreate := dockerTypes.NetworkCreate{
-		Driver:     driver,
 		IPAM:       &network.IPAM{},
 		ConfigFrom: &network.ConfigReference{},
 	}
