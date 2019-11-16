@@ -1,6 +1,8 @@
 package reconciler
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"github.com/docker/docker/errdefs"
 
 	"github.com/docker/stacks/pkg/interfaces"
@@ -106,6 +108,7 @@ func (r *reconciler) Reconcile(request *interfaces.ReconcileResource) error {
 		if algorithmInit != nil {
 			resource, err := algorithmInit.GetActiveResource(*request)
 			if errdefs.IsNotFound(err) {
+				logrus.Infof("Reconciler did not find: kind=%v name=%v id=%v", request.Kind, request.Name, request.ID)
 				// If the resource isn't found,
 				// that means some other mutator is active and
 				// another reconciler approach is required

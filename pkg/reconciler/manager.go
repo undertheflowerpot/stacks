@@ -204,7 +204,7 @@ func (m *Manager) checkLeadership() bool {
 // currently a leader, taking an event to decide whether to actually do API
 // calls.
 func (m *Manager) checkNodeEventLeadership(ev interface{}) bool {
-	logrus.Infof("Manager:checkNodeEventLeadership")
+	logrus.Debugf("Manager:checkNodeEventLeadership")
 	msg, ok := ev.(events.Message)
 	// even though we passed a filter for node events, in the interest
 	// of defensive programming, make sure that's really what this is.

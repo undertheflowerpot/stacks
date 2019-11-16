@@ -20,8 +20,15 @@ lint:
 standalone:
 	docker build $(BUILD_ARGS) -t $(ORG)/$(CONTROLLER_IMAGE_NAME):$(TAG) --target standalone .
 
-e2e:
-	docker build $(BUILD_ARGS) -t $(ORG)/$(E2E_IMAGE_NAME):$(TAG) --target e2e .
+integration:
+	docker build $(BUILD_ARGS) -t $(ORG)/$(CONTROLLER_IMAGE_NAME):integration --target integration .
+
+it: integration
+	- docker rm $(CONTROLLER_IMAGE_NAME)_it
+	docker run -w /go/src/github.com/docker/stacks -v /var/run/docker.sock:/var/run/docker.sock -p 8080:2375 --name $(CONTROLLER_IMAGE_NAME)_it $(ORG)/$(CONTROLLER_IMAGE_NAME):integration
+	docker cp $(CONTROLLER_IMAGE_NAME)_it:/itcover.out .
+	docker rm $(CONTROLLER_IMAGE_NAME)_it
+	go tool cover -html=itcover.out -o=itcoverage.html
 
 # For developers...
 
@@ -30,7 +37,7 @@ e2e:
 cover: test
 	docker create --name $(CONTROLLER_IMAGE_NAME)_cover $(ORG)/$(CONTROLLER_IMAGE_NAME):test  && \
 	    docker cp $(CONTROLLER_IMAGE_NAME)_cover:/cover.out . && docker rm $(CONTROLLER_IMAGE_NAME)_cover
-	go tool cover -html=cover.out
+	go tool cover -html=cover.out -o=coverage.html
 
 build-mocks:
 	@echo "Generating mocks"

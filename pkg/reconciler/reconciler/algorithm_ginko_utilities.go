@@ -26,22 +26,22 @@ type AlgorithmPluginInputs struct {
 	cli                              *fakes.FakeReconcilerClient
 }
 
-// SharedFailedResponseBehavior placeholder
-func SharedFailedResponseBehavior(inputs *AlgorithmPluginInputs) {
+// SimplePluginLookupTests smoke test for looking up resources using the plugin API
+func SimplePluginLookupTests(inputs *AlgorithmPluginInputs) {
 	BeforeEach(func() {
 		inputs.activeResource1, inputs.err1 =
 			inputs.algorithmInit.GetActiveResource(inputs.search1)
 		inputs.activeResource2, inputs.err2 =
 			inputs.algorithmInit.GetActiveResource(inputs.search2)
 	})
-	Context("Testing 5 6 7", func() {
+	Context("ActiveResource1", func() {
 		It("the UN-LABELED resource should not fail", func() {
 			Expect(inputs.err1).ToNot(HaveOccurred())
 			Expect(inputs.activeResource1.GetSnapshot().Name).To(Equal(inputs.search1.Name))
 			Expect("").To(Equal(inputs.activeResource1.GetStackID()))
 		})
 	})
-	Context("Testing 1 2 4", func() {
+	Context("ActiveResource2", func() {
 		It("the LABELED resource should not fail", func() {
 			Expect(inputs.err2).ToNot(HaveOccurred())
 			Expect(inputs.activeResource2.GetSnapshot().Name).To(Equal(inputs.search2.Name))
@@ -159,7 +159,7 @@ func ManuallyStoreGoal(input *AlgorithmPluginInputs) {
 	)
 	BeforeEach(func() {
 		var errSnapshot error
-		snapshot, errSnapshot = input.cli.GetSnapshotStack(input.stackID)
+		snapshot, errSnapshot = (*input.cli).GetSnapshotStack(input.stackID)
 		Expect(errSnapshot).ToNot(HaveOccurred())
 		current, err = input.resourcePlugin.storeGoals(snapshot)
 	})

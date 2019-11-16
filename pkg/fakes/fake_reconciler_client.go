@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 
+	"github.com/docker/stacks/pkg/interfaces"
 	"github.com/docker/stacks/pkg/types"
 )
 
@@ -53,8 +54,15 @@ func (*FakeReconcilerClient) UnsubscribeFromEvents(events chan interface{}) {
 
 }
 
-// NewFakeReconcilerClient creates a BackendClient using the
+// NewFakeBackendAPIClientShim creates a BackendClient using the
 // FIVE fake storage interfaces for stack, service, secret, network, config
+func NewFakeBackendAPIClientShim() interfaces.BackendClient {
+
+	return NewFakeReconcilerClient()
+}
+
+// NewFakeReconcilerClient creates a BackendClient with extra debugging API
+// using the FIVE fake storage interfaces for stack, service, secret, network, config
 func NewFakeReconcilerClient() *FakeReconcilerClient {
 
 	return &FakeReconcilerClient{

@@ -1,6 +1,7 @@
 package standalone
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -101,6 +102,11 @@ func (s *ServerControl) RunServer() error {
 	}()
 
 	return <-errChan
+}
+
+// StopServer shutsdown the httpserver
+func (s *ServerControl) StopServer() error {
+	return s.Server.Shutdown(context.Background())
 }
 
 // versionMatcher defines a variable matcher to be parsed by the router

@@ -17,6 +17,7 @@ var _ = Describe("Algorithm Plugin for Service - Stack Request", func() {
 		err1, err2     error
 		snapshot       interfaces.SnapshotStack
 		serviceSupport algorithmService
+		stackCreate    types.StackCreateResponse
 	)
 	BeforeEach(func() {
 		input.cli = fakes.NewFakeReconcilerClient()
@@ -24,8 +25,9 @@ var _ = Describe("Algorithm Plugin for Service - Stack Request", func() {
 		stack = fakes.GetTestStack("stack12")
 		input.stack = &stack
 		input.algorithmInit = serviceInit
-		input.stackID, err1 = input.cli.AddStack(input.stack.Spec)
-		snapshot, err2 = input.cli.FakeStackStore.GetSnapshotStack(input.stackID)
+		stackCreate, err1 = input.cli.CreateStack(input.stack.Spec)
+		input.stackID = stackCreate.ID
+		snapshot, err2 = input.cli.GetSnapshotStack(input.stackID)
 		input.specName = input.stack.Spec.Services[0].Annotations.Name
 	})
 	It("Initializations Succeed", func() {
@@ -86,7 +88,7 @@ var _ = Describe("Algorithm Plugin for Service - Stack Request", func() {
 						input.stack.Spec.Services[0],
 						interfaces.DefaultUpdateServiceArg4,
 						interfaces.DefaultUpdateServiceArg5)
-			snapshot, err2 = input.cli.FakeStackStore.GetSnapshotStack(input.stackID)
+			snapshot, err2 = input.cli.GetSnapshotStack(input.stackID)
 			serviceSupport := newAlgorithmPluginService(serviceInit, snapshot, input.request)
 			input.resourcePlugin = serviceSupport
 			*/
@@ -104,6 +106,7 @@ var _ = Describe("Algorithm Plugin for Config - Stack Request", func() {
 		err1, err2    error
 		snapshot      interfaces.SnapshotStack
 		configSupport algorithmConfig
+		stackCreate   types.StackCreateResponse
 	)
 	BeforeEach(func() {
 		input.cli = fakes.NewFakeReconcilerClient()
@@ -111,8 +114,9 @@ var _ = Describe("Algorithm Plugin for Config - Stack Request", func() {
 		stack = fakes.GetTestStack("stack12")
 		input.stack = &stack
 		input.algorithmInit = configInit
-		input.stackID, err1 = input.cli.AddStack(input.stack.Spec)
-		snapshot, err2 = input.cli.FakeStackStore.GetSnapshotStack(input.stackID)
+		stackCreate, err1 = input.cli.CreateStack(input.stack.Spec)
+		input.stackID = stackCreate.ID
+		snapshot, err2 = input.cli.GetSnapshotStack(input.stackID)
 		input.specName = input.stack.Spec.Configs[0].Annotations.Name
 	})
 	It("Initializations Succeed", func() {
@@ -168,6 +172,7 @@ var _ = Describe("Algorithm Plugin for Secret - Stack Request", func() {
 		err1, err2    error
 		snapshot      interfaces.SnapshotStack
 		secretSupport algorithmSecret
+		stackCreate   types.StackCreateResponse
 	)
 	BeforeEach(func() {
 		input.cli = fakes.NewFakeReconcilerClient()
@@ -175,8 +180,9 @@ var _ = Describe("Algorithm Plugin for Secret - Stack Request", func() {
 		stack = fakes.GetTestStack("stack12")
 		input.stack = &stack
 		input.algorithmInit = secretInit
-		input.stackID, err1 = input.cli.AddStack(input.stack.Spec)
-		snapshot, err2 = input.cli.FakeStackStore.GetSnapshotStack(input.stackID)
+		stackCreate, err1 = input.cli.CreateStack(input.stack.Spec)
+		input.stackID = stackCreate.ID
+		snapshot, err2 = input.cli.GetSnapshotStack(input.stackID)
 		input.specName = input.stack.Spec.Secrets[0].Annotations.Name
 	})
 	It("Initializations Succeed", func() {
@@ -209,20 +215,10 @@ var _ = Describe("Algorithm Plugin for Secret - Stack Request", func() {
 
 				Context("Manually store goal", func() {
 					ManuallyStoreGoal(&input)
-					Context("Manually update goal", func() {
-						BeforeEach(func() {
-							snapshot, err2 = input.cli.FakeStackStore.GetSnapshotStack(input.stackID)
-							secretSupport := newAlgorithmPluginSecret(secretInit, snapshot, input.request)
-							input.resourcePlugin = secretSupport
-							input.resource = secretSupport.getGoalResource(input.resource.Name)
-							act, _ := secretSupport.GetActiveResource(*input.resource)
-							input.resource.Meta = act.GetSnapshot().Meta
-							Expect(input.resource).ToNot(BeNil())
-						})
-						ManuallyReconcileUpdateGoal(&input)
-					})
 				})
-
+				Context("Manually update goal", func() {
+					ManuallyReconcileUpdateGoal(&input)
+				})
 				Context("Manually remove goal", func() {
 					ManuallyRemoveGoal(&input)
 					Context("Manually remove goal", func() {
@@ -242,6 +238,7 @@ var _ = Describe("Algorithm Plugin for Network - Stack Request", func() {
 		err1, err2     error
 		snapshot       interfaces.SnapshotStack
 		networkSupport algorithmNetwork
+		stackCreate    types.StackCreateResponse
 	)
 	BeforeEach(func() {
 		input.cli = fakes.NewFakeReconcilerClient()
@@ -249,8 +246,9 @@ var _ = Describe("Algorithm Plugin for Network - Stack Request", func() {
 		stack = fakes.GetTestStack("stack12")
 		input.stack = &stack
 		input.algorithmInit = networkInit
-		input.stackID, err1 = input.cli.AddStack(input.stack.Spec)
-		snapshot, err2 = input.cli.FakeStackStore.GetSnapshotStack(input.stackID)
+		stackCreate, err1 = input.cli.CreateStack(input.stack.Spec)
+		input.stackID = stackCreate.ID
+		snapshot, err2 = input.cli.GetSnapshotStack(input.stackID)
 		for networkName := range input.stack.Spec.Networks {
 			input.specName = networkName
 			break
@@ -288,10 +286,6 @@ var _ = Describe("Algorithm Plugin for Network - Stack Request", func() {
 					ManuallyStoreGoal(&input)
 				})
 				Context("Manually update goal", func() {
-					BeforeEach(func() {
-						networkSupport := newAlgorithmPluginNetwork(networkInit, snapshot, input.request)
-						input.resourcePlugin = networkSupport
-					})
 					ManuallyReconcileUpdateGoal(&input)
 				})
 				Context("Manually remove goal", func() {

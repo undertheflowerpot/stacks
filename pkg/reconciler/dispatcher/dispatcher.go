@@ -214,9 +214,9 @@ func (d *dispatcher) resolveMessage(ev interface{}) error {
 func (d *dispatcher) pickObject() *interfaces.ReconcileResource {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	// it should be safe to delete from a map we're iterating over
+	// especially considering we're not iterating any further.
 	for id, stack := range d.pendingStacks {
-		// it should be safe to delete from a map we're iterating over.
-		// especially considering we're not iterating any further.
 		delete(d.pendingStacks, id)
 		return stack
 	}

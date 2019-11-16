@@ -31,6 +31,9 @@ RUN go test -coverpkg=./pkg/... -covermode=count -coverprofile=/cover.out -v $(g
 FROM builder as lint
 RUN gometalinter --config gometalinter.json ./...
 
+FROM builder as integration
+CMD ["go", "test", "-coverpkg=./pkg/...", "-covermode=count",  "-coverprofile=/itcover.out", "-v", "github.com/docker/stacks/cmd/standalone"]
+
 # Standalone server (for testing)
 FROM ${ALPINE_BASE} as standalone
 COPY --from=builder /go/src/github.com/docker/stacks/bin/standalone /standalone
